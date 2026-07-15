@@ -1,0 +1,183 @@
+# DCC Field — Production Build Spec
+
+Crew project management app for Denver Commercial Coatings (DCC), a commercial
+painting contractor coordinating three subcontractor crews. A working prototype
+has been built and user-tested; this spec describes the production version.
+Build exactly this — the workflow decisions below were validated in the prototype.
+
+## Who uses it
+
+- **1 admin** (Alex, owner/PM) — creates projects, posts scope/colors/orders,
+  schedules crews, manages the team.
+- **3 crew accounts** (each login shared by a whole crew): Rocky Mountain Pro
+  Painters ("RMPP"), Lucas Fine Finishes ("Lucas"), Qualipaint ("Quali"). More
+  crews may be added later — crew management must be dynamic, not hardcoded.
+- Crew usage is **on phones in the field**. Mobile-first UI, big touch targets,
+  fast on spotty cell data. Admin uses phone + desktop.
+
+## Stack
+
+- **Backend:** Node.js + Express
+- **Database:** SQLite via better-sqlite3 (file on a persistent volume at /data/app.db)
+- **Frontend:** React (Vite), built and served statically by the same Express
+  app — single deployable service
+- **Auth:** session cookies (express-session with SQLite session store),
+  bcrypt password hashes
+- **File uploads:** multer → resize with sharp → store on volume at /data/uploads/
+- **SMS:** Twilio
+- **Translation:** Anthropic API (current Sonnet model)
+- **PWA:** manifest.json + service worker so crews can "Add to Home Screen."
+  Must also work fine in a plain mobile browser — install is optional, never required.
+- **Deploy target:** Railway, one service, persistent volume mounted at /data
+
+## Environment variables
+
+PORT, DATABASE_PATH=/data/app.db, UPLOADS_PATH=/data/uploads, SESSION_SECRET,
+TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER, ANTHROPIC_API_KEY,
+APP_URL (e.g. https://field.dccpaint.com — used in SMS links)
+
+App must run with Twilio and Anthropic vars missing (features degrade
+gracefully: no texts sent, translate shows "unavailable") so it can be
+developed and demoed before those accounts are live.
+
+## Data model
+
+- **users**: id, username (unique), password_hash, display_name, short_name,
+  role ('admin' | 'crew'), chip_color (hex, used for visual identity
+  throughout the UI), phone (nullable), active (bool)
+- **alert_prefs**: user_id, category, enabled — categories:
+  schedule, project, scope, color, order, photo, note, receipt
+- **projects**: id, name, client, address, crew_id (FK users), status
+  ('Scheduled' | 'In progress' | 'Complete'), scope (text), scope_es (cached
+  translation, nullable), created_at
+- **colors**: id, project_id, manufacturer, name, code, hex, sheen, location_note
+- **orders**: id, project_id, author_id, order_date (date), body (free-form
+  multiline text), created_at, updated_at
+- **notes**: id, project_id, author_id, body, body_es (cached translation,
+  nullable), created_at
+- **photos**: id, project_id, author_id, kind ('picture' | 'receipt' |
+  'rendering'), file_path, thumb_path, created_at
+- **events**: id, project_id, crew_id, date, time_label (free text like
+  "6:00 AM"), title
+- **notifications**: id, user_id (recipient), body, category, project_id
+  (nullable), sms_sent (bool), read (bool), created_at
+
+Seed on first run: admin + the three crews (temporary passwords printed to
+console once). Chip colors: RMPP #C7791B, Lucas #2F7A55, Quali #5B4FBF,
+admin #22262B.
+
+## Permissions
+
+| Capability | Admin | Crew |
+|---|---|---|
+| See projects | all | own crew's only |
+| Create projects, edit scope, add colors, add renderings | yes | no |
+| Add/edit orders | yes | yes (any order on their own projects) |
+| Add pictures, receipts, notes | yes | yes |
+| Schedule calendar events | yes | no (sees own schedule read-only) |
+| Team screen (phones, alert prefs, add crew, reset passwords) | yes | no |
+| Delete anything | yes | no |
+
+## Screens
+
+### Login
+Generic page: username + password only. **Do not list account names.** Dark
+theme with "DCC FIELD" wordmark. Rate-limit attempts. Long-lived session
+(~90 days) so crews aren't logging in every morning.
+
+### Projects (home)
+- Crew: their projects only. Admin: all projects with crew chips and a crew
+  filter, plus "+ New project".
+- Card: name, client, address, status pill, next scheduled event, left border
+  in crew chip color.
+- Status 'Complete' moves a project into a collapsed "Archived" section.
+
+### Project detail — six tabs
+Side rail on desktop, horizontal pills on mobile: **Scope, Pictures, Notes,
+Colors, Orders, Receipts** (with count badges).
+
+1. **Scope of work** — long-form text, preserves line breaks. Admin edits.
+   **Español toggle** for everyone: serves cached scope_es; translation is
+   generated server-side *when the admin saves the scope* (pre-translated so
+   crews never wait), invalidated and regenerated on edit.
+2. **Pictures** — photo grid, tap for full-size, shows who/when. Anyone adds;
+   multi-select upload from phone camera/library. Server resizes (full ~1600px
+   + thumbnail) — never store multi-MB originals.
+3. **Notes** — chat-style thread, author chip + timestamp. Anyone posts.
+   Per-note **Español** button: first tap translates via API and caches
+   body_es; later taps instant for everyone. Toggle back to English.
+4. **Colors** — approved-color cards: swatch (hex), code, name, manufacturer,
+   sheen, location/use. Admin adds. Below: **Renderings** — admin attaches
+   rendering/mockup images, everyone views full-size.
+5. **Orders** — free-form entries: **date + multiline text** ("everything
+   ordered") + author chip. No per-item/qty/status structure. Anyone adds;
+   anyone on the project edits. Newest date first.
+6. **Receipts** — same UI as Pictures, kind='receipt'; delivery tickets and
+   purchase receipts.
+
+### Calendar
+Month grid, events dot-coded by crew chip. Tap day → event list; tap event →
+its project. Admin sees all crews and adds events (pick project → crew
+inferred, title, start time). Crew sees only their own events. Prev/next + Today.
+
+### Team (admin only)
+Card per user: display name, chip color, **phone number**, and toggle chips
+for the eight alert categories = "text this user when this category fires."
+Also: add crew account, deactivate, reset password. Defaults for new users —
+crews: schedule/project/scope/color/order ON; admin: photo/note/order/receipt ON.
+
+### Alerts
+Per-user feed (header bell with unread badge). Each alert: text, timestamp,
+"Text sent" badge if SMS went out, tap-through to project. Opening marks read.
+
+## Notification engine
+
+notify(recipientUserId, category, text, projectId):
+1. Insert notifications row (feed + unread badge).
+2. If recipient has phone AND alert_prefs[category] enabled AND Twilio
+   configured → SMS: "DCC Field: {text}" + link {APP_URL}/p/{projectId}.
+   Record sms_sent. Log failures; never crash the request.
+
+Triggers (validated in prototype):
+- Admin action → notify project's crew: new project (project), scope saved
+  (scope), color/rendering added (color), order added/edited by admin (order),
+  event scheduled (schedule), admin note (note), admin photo (photo).
+- Crew action → notify admin: photo (photo), note (note), order added/edited
+  (order), receipt (receipt).
+
+Debounce photo spam: uploads by one user to one project within ~10 minutes
+collapse into one SMS ("added 5 photos").
+
+## Translation service
+
+Server endpoint wrapping the Anthropic API. Prompt: natural US jobsite Spanish
+for trade crews; **keep product names, color codes (e.g. SW 7029),
+measurements, addresses, and times unchanged**; return only the translation,
+same line breaks. Retry once on 429/5xx/overloaded. Cache results in DB;
+invalidate on source edit. Pre-translate scope on save; translate notes on
+first request.
+
+## Security & ops
+
+- bcrypt (cost 12); secure/httpOnly/sameSite cookies; HTTPS only (Railway TLS)
+- Parameterized queries; uploads validated as images, random filenames, served
+  through an authenticated route (photo URLs must not be publicly guessable)
+- Login rate limiting; sessions invalidated on password reset
+- Nightly SQLite backup on the volume (keep last 14); README documents how to
+  download one
+- Health check endpoint for Railway
+
+## Deployment (Railway)
+
+- Single service from GitHub repo; volume mounted at /data
+- Build: install → vite build → start Express
+- README must cover: local dev, Railway deploy, attaching the volume, env
+  vars, pointing custom domain field.dccpaint.com (CNAME), Twilio A2P 10DLC
+  registration note, adding a new crew.
+
+## Phase 2 (do NOT build now — just keep the design compatible)
+
+- Two-way translation (crew writes Spanish note → admin sees English)
+- Web push as free supplement to SMS
+- Per-project document attachments (PDF plans/specs)
+- Job costing fields on receipts (dollar amounts)

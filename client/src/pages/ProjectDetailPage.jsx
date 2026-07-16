@@ -27,9 +27,11 @@ export default function ProjectDetailPage() {
   const { id } = useParams();
   const { user } = useAuth();
   const [project, setProject] = useState(null);
+  const [crews, setCrews] = useState([]);
   const [tab, setTab] = useState('scope');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [changingCrew, setChangingCrew] = useState(false);
 
   const load = async () => {
     try {
@@ -43,6 +45,11 @@ export default function ProjectDetailPage() {
   };
 
   useEffect(() => { load(); }, [id]);
+  useEffect(() => {
+    if (user.role === 'admin') {
+      api.get('/team').then((rows) => setCrews(rows.filter((u) => u.role === 'crew')));
+    }
+  }, [user.role]);
 
   const bumpCount = (key, delta) => {
     setProject((prev) => ({ ...prev, counts: { ...prev.counts, [key]: Math.max(0, prev.counts[key] + delta) } }));
@@ -95,6 +102,31 @@ export default function ProjectDetailPage() {
               <option>Scheduled</option>
               <option>In progress</option>
               <option>Complete</option>
+            </select>
+          )}
+          {isAdmin && crews.length > 0 && (
+            <select
+              value={project.crew_id}
+              disabled={changingCrew}
+              onChange={async (e) => {
+                const nextCrewId = e.target.value;
+                if (String(nextCrewId) === String(project.crew_id)) return;
+                const nextCrew = crews.find((c) => String(c.id) === String(nextCrewId));
+                if (!confirm(`Reassign this project to ${nextCrew?.display_name}? Their calendar and this project's events will update immediately.`)) {
+                  return;
+                }
+                setChangingCrew(true);
+                try {
+                  const updated = await api.patch(`/projects/${project.id}`, { crew_id: nextCrewId });
+                  setProject(updated);
+                } catch (err) {
+                  alert(err.message);
+                } finally {
+                  setChangingCrew(false);
+                }
+              }}
+            >
+              {crews.map((c) => <option key={c.id} value={c.id}>{c.display_name}</option>)}
             </select>
           )}
         </div>

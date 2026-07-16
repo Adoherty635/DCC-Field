@@ -77,6 +77,13 @@ function syncProjectEvents(project) {
   upsert(project.end_date, 'end', 'Job end');
 }
 
+// Every event tied to a project — auto or manually scheduled — should
+// always belong to whichever crew currently owns the project, so a
+// reassignment moves the whole calendar picture, not just the auto events.
+function reassignProjectEvents(projectId, crewId) {
+  db.prepare('UPDATE events SET crew_id = ? WHERE project_id = ?').run(crewId, projectId);
+}
+
 router.get('/', requireAuth, (req, res) => {
   let rows;
   if (req.session.role === 'admin') {
@@ -126,6 +133,12 @@ router.patch('/:id', requireAuth, requireAdmin, requireProjectAccess(db), asyncH
   const { name, client, address, status, scope, crew_id, start_date, end_date } = req.body || {};
   const project = req.project;
 
+  const crewChanged = crew_id !== undefined && String(crew_id) !== String(project.crew_id);
+  if (crewChanged) {
+    const crew = db.prepare("SELECT * FROM users WHERE id = ? AND role = 'crew'").get(crew_id);
+    if (!crew) return res.status(400).json({ error: 'Invalid crew' });
+  }
+
   const next = {
     name: name !== undefined ? name : project.name,
     client: client !== undefined ? client : project.client,
@@ -153,10 +166,17 @@ router.patch('/:id', requireAuth, requireAdmin, requireProjectAccess(db), asyncH
   );
 
   const updated = db.prepare('SELECT * FROM projects WHERE id = ?').get(project.id);
+
+  if (crewChanged) {
+    reassignProjectEvents(updated.id, updated.crew_id);
+  }
   syncProjectEvents(updated);
 
   if (scopeChanged) {
     await notify(updated.crew_id, 'scope', `Scope of work updated on ${updated.name}`, updated.id);
+  }
+  if (crewChanged) {
+    await notify(updated.crew_id, 'project', `Project reassigned to your crew: ${updated.name}`, updated.id);
   }
 
   res.json(withCounts(updated));

@@ -67,12 +67,15 @@ function notifyBatched(recipientUserId, category, projectId, actorLabel, itemLab
 
   if (entry.timer) clearTimeout(entry.timer);
   entry.timer = setTimeout(async () => {
-    debounceMap.delete(key);
-    const user = smsEligibleUser(recipientUserId, category);
-    if (!user) return;
-    const plural = entry.count === 1 ? itemLabel : `${itemLabel}s`;
-    const text = `${actorLabel} added ${entry.count} ${plural}`;
+    // Runs detached from any request minutes later — an uncaught error or
+    // rejection here crashes the whole process (Node's default for
+    // unhandled rejections), so everything is wrapped, not just the SMS call.
     try {
+      debounceMap.delete(key);
+      const user = smsEligibleUser(recipientUserId, category);
+      if (!user) return;
+      const plural = entry.count === 1 ? itemLabel : `${itemLabel}s`;
+      const text = `${actorLabel} added ${entry.count} ${plural}`;
       const link = `${config.appUrl}/p/${projectId}`;
       const sent = await sendSms(user.phone, `DCC Field: ${text} ${link}`);
       if (sent) markSmsSent(entry.lastNotificationId);

@@ -2,6 +2,20 @@ const path = require('path');
 const express = require('express');
 const session = require('express-session');
 const config = require('./config');
+
+// Last-resort safety net: any error that isn't caught anywhere else
+// (a background timer, a stray unawaited promise) would otherwise crash
+// the process silently. Log it clearly first so it's findable in the
+// deploy logs, then exit deliberately — Railway restarts the container
+// either way, but this way the reason isn't lost.
+process.on('uncaughtException', (err) => {
+  console.error('[fatal] uncaughtException:', err);
+  process.exit(1);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[fatal] unhandledRejection:', reason);
+  process.exit(1);
+});
 require('./db'); // ensures schema is created before anything else touches it
 const sessionStore = require('./db/sessionStore');
 const seed = require('./scripts/seed'); // no-ops once users already exist

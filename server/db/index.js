@@ -9,6 +9,9 @@ fs.mkdirSync(config.uploadsPath, { recursive: true });
 const db = new Database(config.dbPath);
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
+// Without this, a write that collides with another in-flight write fails
+// immediately (SQLITE_BUSY) instead of waiting briefly for the lock to clear.
+db.pragma('busy_timeout = 5000');
 
 const schema = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
 db.exec(schema);

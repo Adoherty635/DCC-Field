@@ -12,9 +12,15 @@ class SqliteSessionStore extends session.Store {
     this.destroyStmt = db.prepare('DELETE FROM sessions WHERE sid = ?');
     this.touchStmt = db.prepare('UPDATE sessions SET expires = ? WHERE sid = ?');
 
-    // Periodically sweep expired sessions.
+    // Periodically sweep expired sessions. This runs on a bare timer with
+    // no request/response around it, so an uncaught error here would crash
+    // the whole process instead of just failing one HTTP request.
     this._sweepInterval = setInterval(() => {
-      db.prepare('DELETE FROM sessions WHERE expires < ?').run(Date.now());
+      try {
+        db.prepare('DELETE FROM sessions WHERE expires < ?').run(Date.now());
+      } catch (err) {
+        console.error('[sessionStore] sweep failed:', err.message);
+      }
     }, 60 * 60 * 1000).unref();
   }
 

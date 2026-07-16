@@ -96,7 +96,10 @@ export default function CalendarPage() {
 
   useEffect(() => { load(); }, [cursor]);
   useEffect(() => {
-    if (user.role === 'admin') api.get('/projects').then(setProjects);
+    // Scoped server-side per role — crews only ever get their own projects
+    // back, admin gets all of them. This is what keeps each crew's bars
+    // private to them on their own calendar.
+    api.get('/projects').then(setProjects);
   }, []);
 
   const days = daysInGrid(cursor.getFullYear(), cursor.getMonth());
@@ -106,6 +109,18 @@ export default function CalendarPage() {
   }
   const todayKey = dateStr(new Date());
   const selectedEvents = eventsByDay[selectedDay] || [];
+
+  const rangedProjects = projects.filter((p) => p.start_date && p.end_date);
+  const barsForDay = (dayKey) =>
+    rangedProjects.filter((p) => p.start_date <= dayKey && dayKey <= p.end_date);
+
+  // A start/end auto-event is redundant with the bar on days its project
+  // already spans as a range — skip it so the cell isn't cluttered.
+  const isBarCovered = (ev) => {
+    if (!ev.auto_type) return false;
+    const project = projects.find((p) => p.id === ev.project_id);
+    return Boolean(project && project.start_date && project.end_date);
+  };
 
   return (
     <div className="page">
@@ -131,7 +146,8 @@ export default function CalendarPage() {
             {DOW.map((d) => <div key={d} className="calendar-dow">{d}</div>)}
             {days.map((d) => {
               const key = dateStr(d);
-              const dayEvents = eventsByDay[key] || [];
+              const dayEvents = (eventsByDay[key] || []).filter((ev) => !isBarCovered(ev));
+              const bars = barsForDay(key);
               const outOfMonth = d.getMonth() !== cursor.getMonth();
               return (
                 <button
@@ -140,11 +156,36 @@ export default function CalendarPage() {
                   onClick={() => setSelectedDay(key)}
                 >
                   <span className="day-num">{d.getDate()}</span>
-                  <span className="calendar-dots">
-                    {dayEvents.slice(0, 4).map((ev) => (
-                      <span key={ev.id} className="calendar-dot" style={{ background: ev.crew_chip_color }} />
-                    ))}
-                  </span>
+                  {bars.length > 0 && (
+                    <span className="calendar-bars">
+                      {bars.slice(0, 3).map((p) => {
+                        const isStart = p.start_date === key;
+                        const isEnd = p.end_date === key;
+                        return (
+                          <span
+                            key={p.id}
+                            className="calendar-bar-segment"
+                            title={`${p.name} (${p.crew.short_name})`}
+                            style={{
+                              background: p.crew.chip_color,
+                              borderTopLeftRadius: isStart ? 4 : 0,
+                              borderBottomLeftRadius: isStart ? 4 : 0,
+                              borderTopRightRadius: isEnd ? 4 : 0,
+                              borderBottomRightRadius: isEnd ? 4 : 0,
+                            }}
+                          />
+                        );
+                      })}
+                      {bars.length > 3 && <span className="calendar-bar-more">+{bars.length - 3} more</span>}
+                    </span>
+                  )}
+                  {dayEvents.length > 0 && (
+                    <span className="calendar-dots">
+                      {dayEvents.slice(0, 4).map((ev) => (
+                        <span key={ev.id} className="calendar-dot" style={{ background: ev.crew_chip_color }} />
+                      ))}
+                    </span>
+                  )}
                 </button>
               );
             })}

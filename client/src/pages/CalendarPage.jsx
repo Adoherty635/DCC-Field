@@ -108,7 +108,6 @@ export default function CalendarPage() {
     (eventsByDay[ev.date] = eventsByDay[ev.date] || []).push(ev);
   }
   const todayKey = dateStr(new Date());
-  const selectedEvents = eventsByDay[selectedDay] || [];
 
   const rangedProjects = projects.filter((p) => p.start_date && p.end_date);
   const barsForDay = (dayKey) =>
@@ -121,6 +120,20 @@ export default function CalendarPage() {
     const project = projects.find((p) => p.id === ev.project_id);
     return Boolean(project && project.start_date && project.end_date);
   };
+
+  function projectDayLabel(project, dayKey) {
+    const isStart = project.start_date === dayKey;
+    const isEnd = project.end_date === dayKey;
+    if (isStart && isEnd) return 'Starts & ends today';
+    if (isStart) return 'Starts today';
+    if (isEnd) return 'Ends today';
+    return 'In progress';
+  }
+
+  const dayProjects = barsForDay(selectedDay);
+  // Manual, specifically-scheduled events (site visits etc.) — auto Job
+  // start/end rows are left out here since dayProjects already covers them.
+  const dayManualEvents = (eventsByDay[selectedDay] || []).filter((ev) => !ev.auto_type);
 
   return (
     <div className="page">
@@ -193,18 +206,32 @@ export default function CalendarPage() {
 
           <div className="day-list">
             <h3>{selectedDay}</h3>
-            {selectedEvents.length === 0 ? (
-              <div className="empty-state">No events.</div>
+
+            {dayProjects.length === 0 && dayManualEvents.length === 0 ? (
+              <div className="empty-state">No projects or events.</div>
             ) : (
-              selectedEvents.map((ev) => (
-                <Link key={ev.id} to={`/p/${ev.project_id}`} className="event-row">
-                  <Dot color={ev.crew_chip_color} />
-                  <div>
-                    <div><strong>{ev.time_label}</strong> {ev.title}</div>
-                    <div className="meta" style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>{ev.project_name} · {ev.crew_short_name}</div>
-                  </div>
-                </Link>
-              ))
+              <>
+                {dayProjects.map((p) => (
+                  <Link key={p.id} to={`/p/${p.id}`} className="event-row">
+                    <Dot color={p.crew.chip_color} />
+                    <div>
+                      <div><strong>{p.name}</strong></div>
+                      <div className="meta" style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+                        {p.crew.short_name} · {projectDayLabel(p, selectedDay)} ({p.start_date} – {p.end_date})
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+                {dayManualEvents.map((ev) => (
+                  <Link key={ev.id} to={`/p/${ev.project_id}`} className="event-row">
+                    <Dot color={ev.crew_chip_color} />
+                    <div>
+                      <div><strong>{ev.time_label}</strong> {ev.title}</div>
+                      <div className="meta" style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>{ev.project_name} · {ev.crew_short_name}</div>
+                    </div>
+                  </Link>
+                ))}
+              </>
             )}
           </div>
         </>

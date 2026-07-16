@@ -2,7 +2,7 @@
   "name": "dcc-field",
   "version": "1.0.0",
   "private": true,
-  "description": "DCC Field - crew project management app for Denver Commercial Coatings",
+  "description": "DCC Project Manager - crew project management app for Denver Commercial Coatings",
   "main": "server/index.js",
   "scripts": {
     "dev:server": "node --watch server/index.js",

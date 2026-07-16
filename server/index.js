@@ -79,7 +79,7 @@ app.get(/^\/(?!api).*/, (req, res) => {
 seed();
 
 app.listen(config.port, () => {
-  console.log(`DCC Field listening on port ${config.port}`);
+  console.log(`DCC Project Manager listening on port ${config.port}`);
   if (!config.twilio.configured) console.log('  Twilio not configured — SMS disabled.');
   if (!config.anthropicConfigured) console.log('  Anthropic not configured — translation disabled.');
 });

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../AuthContext.jsx';
 import { api } from '../api/client.js';
+import Logo from './Logo.jsx';
 
 export default function Header() {
   const { user, logout } = useAuth();
@@ -28,7 +29,10 @@ export default function Header() {
   return (
     <>
       <div className="app-header">
-        <a className="wordmark" href="/">DCC FIELD</a>
+        <a className="wordmark" href="/">
+          <Logo size={30} />
+          <span>DCC Project Manager</span>
+        </a>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <NavLink to="/alerts" className="bell-btn" aria-label="Alerts">
             🔔

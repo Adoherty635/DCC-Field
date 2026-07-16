@@ -39,7 +39,7 @@ async function notify(recipientUserId, category, text, projectId) {
 
   try {
     const link = `${config.appUrl}/p/${projectId}`;
-    const sent = await sendSms(user.phone, `DCC Field: ${text} ${link}`);
+    const sent = await sendSms(user.phone, `DCC PM: ${text} ${link}`);
     if (sent) markSmsSent(notificationId);
   } catch (err) {
     console.error('[notify] sms failed:', err.message);
@@ -77,7 +77,7 @@ function notifyBatched(recipientUserId, category, projectId, actorLabel, itemLab
       const plural = entry.count === 1 ? itemLabel : `${itemLabel}s`;
       const text = `${actorLabel} added ${entry.count} ${plural}`;
       const link = `${config.appUrl}/p/${projectId}`;
-      const sent = await sendSms(user.phone, `DCC Field: ${text} ${link}`);
+      const sent = await sendSms(user.phone, `DCC PM: ${text} ${link}`);
       if (sent) markSmsSent(entry.lastNotificationId);
     } catch (err) {
       console.error('[notify] batched sms failed:', err.message);

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../AuthContext.jsx';
+import Logo from '../components/Logo.jsx';
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -23,7 +24,8 @@ export default function LoginPage() {
 
   return (
     <div className="login-screen">
-      <div className="login-wordmark">DCC FIELD</div>
+      <Logo size={96} />
+      <div className="login-wordmark">DCC Project Manager</div>
       <form className="login-card" onSubmit={submit}>
         <input
           type="text"

@@ -1,4 +1,4 @@
-# DCC Field
+# DCC Project Manager
 
 Crew project management app for Denver Commercial Coatings (DCC) — a single
 Node/Express service that serves a React (Vite) frontend and a SQLite

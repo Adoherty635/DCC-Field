@@ -9,7 +9,14 @@ function statusClass(status) {
   return `status-pill status-${status.replace(/\s+/g, '-')}`;
 }
 
+function dateRangeLabel(start, end) {
+  if (!start && !end) return null;
+  if (start && end) return `${start} – ${end}`;
+  return start ? `Starts ${start}` : `Ends ${end}`;
+}
+
 function ProjectCard({ project }) {
+  const range = dateRangeLabel(project.start_date, project.end_date);
   return (
     <Link to={`/p/${project.id}`} className="project-card" style={{ borderLeftColor: project.crew.chip_color }}>
       <div className="row1">
@@ -19,7 +26,10 @@ function ProjectCard({ project }) {
         </div>
         <span className={statusClass(project.status)}>{project.status}</span>
       </div>
-      <Chip color={project.crew.chip_color} label={project.crew.short_name} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <Chip color={project.crew.chip_color} label={project.crew.short_name} />
+        {range && <span className="meta">{range}</span>}
+      </div>
       {project.next_event && (
         <p className="next-event">
           Next: {project.next_event.title} — {project.next_event.date} {project.next_event.time_label}
@@ -30,7 +40,10 @@ function ProjectCard({ project }) {
 }
 
 function NewProjectModal({ crews, onClose, onCreated }) {
-  const [form, setForm] = useState({ name: '', client: '', address: '', crew_id: crews[0]?.id || '', scope: '' });
+  const [form, setForm] = useState({
+    name: '', client: '', address: '', crew_id: crews[0]?.id || '', scope: '',
+    start_date: '', end_date: '',
+  });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -71,6 +84,16 @@ function NewProjectModal({ crews, onClose, onCreated }) {
               <option key={c.id} value={c.id}>{c.display_name}</option>
             ))}
           </select>
+        </div>
+        <div style={{ display: 'flex', gap: 12 }}>
+          <div className="field" style={{ flex: 1 }}>
+            <label>Start date</label>
+            <input type="date" value={form.start_date} onChange={(e) => setForm({ ...form, start_date: e.target.value })} />
+          </div>
+          <div className="field" style={{ flex: 1 }}>
+            <label>End date</label>
+            <input type="date" value={form.end_date} onChange={(e) => setForm({ ...form, end_date: e.target.value })} />
+          </div>
         </div>
         <div className="field">
           <label>Scope of work</label>

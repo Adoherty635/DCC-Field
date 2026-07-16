@@ -82,7 +82,7 @@ export default function ProjectDetailPage() {
           </div>
           <span className={statusClass(project.status)}>{project.status}</span>
         </div>
-        <div style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <Chip color={project.crew.chip_color} label={project.crew.short_name} />
           {isAdmin && (
             <select
@@ -98,6 +98,39 @@ export default function ProjectDetailPage() {
             </select>
           )}
         </div>
+
+        {isAdmin ? (
+          <div style={{ marginTop: 10, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>Start date</label>
+              <input
+                type="date"
+                value={project.start_date || ''}
+                onChange={async (e) => {
+                  const updated = await api.patch(`/projects/${project.id}`, { start_date: e.target.value });
+                  setProject(updated);
+                }}
+              />
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>End date</label>
+              <input
+                type="date"
+                value={project.end_date || ''}
+                onChange={async (e) => {
+                  const updated = await api.patch(`/projects/${project.id}`, { end_date: e.target.value });
+                  setProject(updated);
+                }}
+              />
+            </div>
+          </div>
+        ) : (project.start_date || project.end_date) ? (
+          <p className="meta" style={{ marginTop: 10 }}>
+            {project.start_date && `Start: ${project.start_date}`}
+            {project.start_date && project.end_date && '  ·  '}
+            {project.end_date && `End: ${project.end_date}`}
+          </p>
+        ) : null}
       </div>
 
       <div className="detail-layout">

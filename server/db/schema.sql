@@ -28,6 +28,11 @@ CREATE TABLE IF NOT EXISTS projects (
   status TEXT NOT NULL DEFAULT 'Scheduled' CHECK (status IN ('Scheduled','In progress','Complete')),
   scope TEXT NOT NULL DEFAULT '',
   scope_es TEXT,
+  scope_doc_path TEXT,
+  scope_doc_name TEXT,
+  scope_doc_mime TEXT,
+  start_date TEXT,
+  end_date TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -79,6 +84,7 @@ CREATE TABLE IF NOT EXISTS events (
   date TEXT NOT NULL,
   time_label TEXT,
   title TEXT NOT NULL,
+  auto_type TEXT CHECK (auto_type IN ('start', 'end') OR auto_type IS NULL),
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

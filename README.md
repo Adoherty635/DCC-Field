@@ -94,17 +94,13 @@ shows "Translation unavailable" instead of erroring.
    ```
    `PORT` is set automatically by Railway — don't override it.
 
-4. **Seed the first users.** After the first deploy, open a shell on the
-   Railway service (or run it once locally against the same `/data` volume
-   if you're comfortable doing so) and run:
-   ```bash
-   npm run seed
-   ```
-   This only seeds if the `users` table is empty, so it's safe to leave in
-   your deploy process — it won't re-run against a populated database. Copy
-   down the temporary passwords it prints; they aren't stored anywhere and
-   won't be shown again. Change them from the Team screen (or have the admin
-   reset them) once everyone's logged in.
+4. **First users are created automatically.** The server seeds the admin +
+   3 crew accounts itself on first boot if the `users` table is empty — no
+   shell access needed. Open the **Deployments** tab → click the active
+   deployment → **View Logs**, and look near the top for the temporary
+   passwords it printed. They aren't stored anywhere and won't be shown
+   again, so copy them down now. Change them from the Team screen (or have
+   the admin reset them) once everyone's logged in.
 
 5. **Point the custom domain.** In Settings → Networking → Custom Domain, add
    `field.dccpaint.com` and create the CNAME record Railway gives you at your

@@ -54,4 +54,8 @@ function seed() {
   console.log('Change these via the Team screen after first login.');
 }
 
-seed();
+if (require.main === module) {
+  seed();
+}
+
+module.exports = seed;

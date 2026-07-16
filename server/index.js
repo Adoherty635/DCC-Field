@@ -4,6 +4,7 @@ const session = require('express-session');
 const config = require('./config');
 require('./db'); // ensures schema is created before anything else touches it
 const sessionStore = require('./db/sessionStore');
+const seed = require('./scripts/seed'); // no-ops once users already exist
 
 const authRoutes = require('./routes/auth');
 const projectRoutes = require('./routes/projects');
@@ -60,6 +61,8 @@ app.use(express.static(clientDist));
 app.get(/^\/(?!api).*/, (req, res) => {
   res.sendFile(path.join(clientDist, 'index.html'));
 });
+
+seed();
 
 app.listen(config.port, () => {
   console.log(`DCC Field listening on port ${config.port}`);

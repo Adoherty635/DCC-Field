@@ -1,14 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext.jsx';
 import { api } from '../api/client.js';
 import Chip from '../components/Chip.jsx';
+import EditProjectModal from '../components/EditProjectModal.jsx';
 import ScopeTab from '../components/tabs/ScopeTab.jsx';
 import PicturesTab from '../components/tabs/PicturesTab.jsx';
 import NotesTab from '../components/tabs/NotesTab.jsx';
 import ColorsTab from '../components/tabs/ColorsTab.jsx';
 import OrdersTab from '../components/tabs/OrdersTab.jsx';
 import ReceiptsTab from '../components/tabs/ReceiptsTab.jsx';
+import PunchListTab from '../components/tabs/PunchListTab.jsx';
 
 const TABS = [
   { key: 'scope', label: 'Scope', icon: '📋' },
@@ -17,6 +19,7 @@ const TABS = [
   { key: 'colors', label: 'Colors', icon: '🎨', countKey: 'colors' },
   { key: 'orders', label: 'Orders', icon: '📦', countKey: 'orders' },
   { key: 'receipts', label: 'Receipts', icon: '🧾', countKey: 'receipts' },
+  { key: 'punchlist', label: 'Punch List', icon: '✅' },
 ];
 
 function statusClass(status) {
@@ -25,6 +28,7 @@ function statusClass(status) {
 
 export default function ProjectDetailPage() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [project, setProject] = useState(null);
   const [crews, setCrews] = useState([]);
@@ -32,6 +36,7 @@ export default function ProjectDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [changingCrew, setChangingCrew] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
 
   const load = async () => {
     try {
@@ -68,6 +73,7 @@ export default function ProjectDetailPage() {
       case 'colors': return <ColorsTab projectId={project.id} isAdmin={isAdmin} onCountChange={(d) => bumpCount('colors', d)} />;
       case 'orders': return <OrdersTab projectId={project.id} isAdmin={isAdmin} onCountChange={(d) => bumpCount('orders', d)} />;
       case 'receipts': return <ReceiptsTab projectId={project.id} isAdmin={isAdmin} onCountChange={(d) => bumpCount('receipts', d)} />;
+      case 'punchlist': return <PunchListTab project={project} isAdmin={isAdmin} onUpdated={setProject} />;
       default: return null;
     }
   };
@@ -87,7 +93,12 @@ export default function ProjectDetailPage() {
             <h1>{project.name}</h1>
             <p className="meta">{project.client}{project.client && project.address ? ' · ' : ''}{project.address}</p>
           </div>
-          <span className={statusClass(project.status)}>{project.status}</span>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+            <span className={statusClass(project.status)}>{project.status}</span>
+            {isAdmin && (
+              <button className="card-edit-btn" onClick={() => setShowEdit(true)}>Edit</button>
+            )}
+          </div>
         </div>
         <div style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <Chip color={project.crew.chip_color} label={project.crew.short_name} />
@@ -176,6 +187,15 @@ export default function ProjectDetailPage() {
           {renderTab()}
         </div>
       </div>
+
+      {showEdit && (
+        <EditProjectModal
+          project={project}
+          onClose={() => setShowEdit(false)}
+          onSaved={(updated) => { setProject(updated); setShowEdit(false); }}
+          onDeleted={() => navigate('/')}
+        />
+      )}
     </div>
   );
 }

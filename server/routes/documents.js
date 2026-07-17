@@ -8,6 +8,7 @@ const config = require('../config');
 const { requireAuth, requireAdmin, requireProjectAccess } = require('../middleware/auth');
 const uploadDoc = require('../middleware/uploadDoc');
 const { notify } = require('../services/notify');
+const { getAdminUserIds } = require('../services/recipients');
 const asyncHandler = require('../middleware/asyncHandler');
 
 const router = express.Router({ mergeParams: true });
@@ -25,7 +26,9 @@ const EXT_BY_MIME = {
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '.xlsx',
 };
 
-const CATEGORY_TO_NOTIFY = { scope: 'scope', rendering: 'color' };
+const CATEGORY_TO_NOTIFY = { scope: 'scope', rendering: 'color', punch_list: 'note' };
+const CATEGORY_LABEL = { scope: 'Scope document', rendering: 'Rendering', punch_list: 'Punch list attachment' };
+const ADMIN_ONLY_CATEGORIES = new Set(['scope', 'rendering']);
 
 function documentSelect() {
   return `SELECT documents.*, users.display_name AS author_name, users.short_name AS author_short_name,
@@ -64,13 +67,15 @@ router.get('/', requireAuth, requireProjectAccess(db), (req, res) => {
 router.post(
   '/',
   requireAuth,
-  requireAdmin,
   requireProjectAccess(db),
   uploadDoc.array('files', 20),
   asyncHandler(async (req, res) => {
     const { category } = req.body;
-    if (!['scope', 'rendering'].includes(category)) {
+    if (!['scope', 'rendering', 'punch_list'].includes(category)) {
       return res.status(400).json({ error: 'Invalid category' });
+    }
+    if (ADMIN_ONLY_CATEGORIES.has(category) && req.session.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin only' });
     }
     if (!req.files || !req.files.length) {
       return res.status(400).json({ error: 'No files uploaded' });
@@ -89,9 +94,18 @@ router.post(
       saved.push(db.prepare(`${documentSelect()} WHERE documents.id = ?`).get(info.lastInsertRowid));
     }
 
-    const label = category === 'scope' ? 'Scope document' : 'Rendering';
+    const label = CATEGORY_LABEL[category];
     const plural = req.files.length > 1 ? 's' : '';
-    await notify(project.crew_id, CATEGORY_TO_NOTIFY[category], `${label}${plural} added to ${project.name}`, project.id);
+    const notifyCategory = CATEGORY_TO_NOTIFY[category];
+    const text = `${label}${plural} added to ${project.name}`;
+
+    if (ADMIN_ONLY_CATEGORIES.has(category) || req.session.role === 'admin') {
+      await notify(project.crew_id, notifyCategory, text, project.id);
+    } else {
+      for (const adminId of getAdminUserIds()) {
+        await notify(adminId, notifyCategory, text, project.id);
+      }
+    }
 
     res.status(201).json(saved);
   })

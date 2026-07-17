@@ -27,7 +27,8 @@ function fileIcon(mime) {
   return '📄';
 }
 
-export default function DocumentGrid({ projectId, category, isAdmin, itemLabel = 'file' }) {
+export default function DocumentGrid({ projectId, category, isAdmin, canUpload, itemLabel = 'file' }) {
+  const uploadAllowed = canUpload !== undefined ? canUpload : isAdmin;
   const [docs, setDocs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -71,7 +72,7 @@ export default function DocumentGrid({ projectId, category, isAdmin, itemLabel =
 
   return (
     <div>
-      {isAdmin && (
+      {uploadAllowed && (
         <label className="upload-btn" style={{ marginBottom: 12 }}>
           {uploading ? 'Uploading…' : `📎 Add ${itemLabel}s`}
           <input

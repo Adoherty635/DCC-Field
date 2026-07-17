@@ -31,6 +31,37 @@ ensureColumn('projects', 'scope_doc_mime', 'TEXT');
 ensureColumn('projects', 'start_date', 'TEXT');
 ensureColumn('projects', 'end_date', 'TEXT');
 ensureColumn('events', 'auto_type', 'TEXT');
+ensureColumn('projects', 'punch_list', "TEXT NOT NULL DEFAULT ''");
+
+// SQLite can't ALTER a CHECK constraint in place — a database created before
+// 'punch_list' was a valid documents.category needs the table rebuilt (data
+// preserved) to accept it. No-ops once already rebuilt.
+function ensureDocumentsCategoryIncludesPunchList() {
+  const table = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'documents'").get();
+  if (!table || table.sql.includes('punch_list')) return;
+
+  db.transaction(() => {
+    db.exec('ALTER TABLE documents RENAME TO documents_old');
+    db.exec(`
+      CREATE TABLE documents (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        author_id INTEGER NOT NULL REFERENCES users(id),
+        category TEXT NOT NULL CHECK (category IN ('scope', 'rendering', 'punch_list')),
+        file_path TEXT NOT NULL,
+        thumb_path TEXT,
+        original_name TEXT,
+        mime TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )
+    `);
+    db.exec('INSERT INTO documents SELECT * FROM documents_old');
+    db.exec('DROP TABLE documents_old');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_documents_project ON documents(project_id, category)');
+  })();
+}
+
+ensureDocumentsCategoryIncludesPunchList();
 
 // One-time migration: the old single scope_doc_* columns and the
 // photos(kind='rendering') rows are superseded by the documents table

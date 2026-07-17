@@ -1,7 +1,11 @@
 const express = require('express');
+const fs = require('fs');
+const path = require('path');
 const db = require('../db');
+const config = require('../config');
 const { requireAuth, requireAdmin, requireProjectAccess } = require('../middleware/auth');
 const { notify } = require('../services/notify');
+const { getAdminUserIds } = require('../services/recipients');
 const { translateToSpanish } = require('../services/translate');
 const asyncHandler = require('../middleware/asyncHandler');
 
@@ -168,5 +172,43 @@ router.patch('/:id', requireAuth, requireAdmin, requireProjectAccess(db), asyncH
 
   res.json(withCounts(updated));
 }));
+
+// Punch list is editable by both admin and crew (unlike scope), so this is
+// deliberately separate from the admin-only PATCH /:id above.
+router.patch('/:id/punch-list', requireAuth, requireProjectAccess(db), asyncHandler(async (req, res) => {
+  const { punch_list } = req.body || {};
+  if (punch_list === undefined) return res.status(400).json({ error: 'punch_list required' });
+
+  const project = req.project;
+  db.prepare('UPDATE projects SET punch_list = ? WHERE id = ?').run(punch_list, project.id);
+  const updated = db.prepare('SELECT * FROM projects WHERE id = ?').get(project.id);
+
+  if (req.session.role === 'admin') {
+    await notify(project.crew_id, 'note', `Punch list updated on ${project.name}`, project.id);
+  } else {
+    for (const adminId of getAdminUserIds()) {
+      await notify(adminId, 'note', `Punch list updated on ${project.name}`, project.id);
+    }
+  }
+
+  res.json(withCounts(updated));
+}));
+
+router.delete('/:id', requireAuth, requireAdmin, requireProjectAccess(db), (req, res) => {
+  const project = req.project;
+
+  const photoFiles = db.prepare('SELECT file_path, thumb_path FROM photos WHERE project_id = ?').all(project.id);
+  const docFiles = db.prepare('SELECT file_path, thumb_path FROM documents WHERE project_id = ?').all(project.id);
+
+  db.prepare('DELETE FROM projects WHERE id = ?').run(project.id);
+
+  for (const row of [...photoFiles, ...docFiles]) {
+    for (const p of [row.file_path, row.thumb_path]) {
+      if (p) fs.unlink(path.join(config.uploadsPath, p), () => {});
+    }
+  }
+
+  res.json({ ok: true });
+});
 
 module.exports = router;

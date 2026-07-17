@@ -4,6 +4,7 @@ import { useAuth } from '../AuthContext.jsx';
 import { api } from '../api/client.js';
 import Chip from '../components/Chip.jsx';
 import Modal from '../components/Modal.jsx';
+import EditProjectModal from '../components/EditProjectModal.jsx';
 
 function statusClass(status) {
   return `status-pill status-${status.replace(/\s+/g, '-')}`;
@@ -15,7 +16,7 @@ function dateRangeLabel(start, end) {
   return start ? `Starts ${start}` : `Ends ${end}`;
 }
 
-function ProjectCard({ project }) {
+function ProjectCard({ project, isAdmin, onEdit }) {
   const range = dateRangeLabel(project.start_date, project.end_date);
   return (
     <Link to={`/p/${project.id}`} className="project-card" style={{ borderLeftColor: project.crew.chip_color }}>
@@ -24,7 +25,18 @@ function ProjectCard({ project }) {
           <h3>{project.name}</h3>
           <p className="meta">{project.client}{project.client && project.address ? ' · ' : ''}{project.address}</p>
         </div>
-        <span className={statusClass(project.status)}>{project.status}</span>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+          <span className={statusClass(project.status)}>{project.status}</span>
+          {isAdmin && (
+            <button
+              className="card-edit-btn"
+              aria-label={`Edit ${project.name}`}
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onEdit(project); }}
+            >
+              Edit
+            </button>
+          )}
+        </div>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <Chip color={project.crew.chip_color} label={project.crew.short_name} />
@@ -116,6 +128,7 @@ export default function ProjectsPage() {
   const [crewFilter, setCrewFilter] = useState(null);
   const [showArchived, setShowArchived] = useState(false);
   const [showNew, setShowNew] = useState(false);
+  const [editingProject, setEditingProject] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const load = async () => {
@@ -161,7 +174,9 @@ export default function ProjectsPage() {
         <div className="empty-state">No projects yet.</div>
       ) : (
         <div className="project-list">
-          {active.map((p) => <ProjectCard key={p.id} project={p} />)}
+          {active.map((p) => (
+            <ProjectCard key={p.id} project={p} isAdmin={user.role === 'admin'} onEdit={setEditingProject} />
+          ))}
         </div>
       )}
 
@@ -172,7 +187,9 @@ export default function ProjectsPage() {
           </button>
           {showArchived && (
             <div className="project-list">
-              {archived.map((p) => <ProjectCard key={p.id} project={p} />)}
+              {archived.map((p) => (
+                <ProjectCard key={p.id} project={p} isAdmin={user.role === 'admin'} onEdit={setEditingProject} />
+              ))}
             </div>
           )}
         </>
@@ -185,6 +202,21 @@ export default function ProjectsPage() {
           onCreated={(project) => {
             setShowNew(false);
             setProjects((prev) => [project, ...prev]);
+          }}
+        />
+      )}
+
+      {editingProject && (
+        <EditProjectModal
+          project={editingProject}
+          onClose={() => setEditingProject(null)}
+          onSaved={(updated) => {
+            setProjects((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+            setEditingProject(null);
+          }}
+          onDeleted={(id) => {
+            setProjects((prev) => prev.filter((p) => p.id !== id));
+            setEditingProject(null);
           }}
         />
       )}

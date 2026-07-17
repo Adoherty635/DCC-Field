@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS projects (
   scope_doc_mime TEXT,
   start_date TEXT,
   end_date TEXT,
+  punch_list TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -81,7 +82,7 @@ CREATE TABLE IF NOT EXISTS documents (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   author_id INTEGER NOT NULL REFERENCES users(id),
-  category TEXT NOT NULL CHECK (category IN ('scope', 'rendering')),
+  category TEXT NOT NULL CHECK (category IN ('scope', 'rendering', 'punch_list')),
   file_path TEXT NOT NULL,
   thumb_path TEXT,
   original_name TEXT,

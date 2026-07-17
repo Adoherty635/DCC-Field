@@ -3,10 +3,12 @@ import { NavLink } from 'react-router-dom';
 import { useAuth } from '../AuthContext.jsx';
 import { api } from '../api/client.js';
 import Logo from './Logo.jsx';
+import ChangePasswordModal from './ChangePasswordModal.jsx';
 
 export default function Header() {
   const { user, logout } = useAuth();
   const [unread, setUnread] = useState(0);
+  const [showChangePassword, setShowChangePassword] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -38,6 +40,14 @@ export default function Header() {
             🔔
             {unread > 0 && <span className="bell-badge">{unread > 99 ? '99+' : unread}</span>}
           </NavLink>
+          <button
+            className="bell-btn"
+            aria-label="Change password"
+            title="Change password"
+            onClick={() => setShowChangePassword(true)}
+          >
+            🔑
+          </button>
           <button className="logout-btn" onClick={logout}>Log out</button>
         </div>
       </div>
@@ -48,6 +58,10 @@ export default function Header() {
           <NavLink to="/team" className={({ isActive }) => (isActive ? 'active' : '')}>Team</NavLink>
         )}
       </div>
+
+      {showChangePassword && (
+        <ChangePasswordModal onClose={() => setShowChangePassword(false)} />
+      )}
     </>
   );
 }

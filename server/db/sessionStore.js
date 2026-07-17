@@ -72,11 +72,14 @@ class SqliteSessionStore extends session.Store {
     }
   }
 
-  // Invalidates every session belonging to a given userId (e.g. on password reset).
-  invalidateUser(userId) {
+  // Invalidates every session belonging to a given userId (e.g. on password
+  // reset). Pass exceptSid to keep one session alive — used when a user
+  // changes their own password, so they aren't immediately logged out.
+  invalidateUser(userId, exceptSid) {
     const rows = db.prepare('SELECT sid, sess FROM sessions').all();
     const destroy = db.prepare('DELETE FROM sessions WHERE sid = ?');
     for (const row of rows) {
+      if (row.sid === exceptSid) continue;
       try {
         const data = JSON.parse(row.sess);
         if (data.userId === userId) destroy.run(row.sid);

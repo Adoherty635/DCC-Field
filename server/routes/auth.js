@@ -2,10 +2,12 @@ const express = require('express');
 const bcrypt = require('bcrypt');
 const rateLimit = require('express-rate-limit');
 const db = require('../db');
+const sessionStore = require('../db/sessionStore');
 const { requireAuth } = require('../middleware/auth');
 const { ALERT_CATEGORIES } = require('../constants');
 
 const router = express.Router();
+const BCRYPT_COST = 12;
 
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -69,6 +71,30 @@ router.get('/me', requireAuth, (req, res) => {
   for (const row of prefRows) prefs[row.category] = row.enabled;
 
   res.json({ user: publicUser(user), alert_prefs: prefs });
+});
+
+router.post('/change-password', requireAuth, (req, res) => {
+  const { current_password, new_password } = req.body || {};
+  if (!current_password || !new_password) {
+    return res.status(400).json({ error: 'Current and new password required' });
+  }
+  if (new_password.length < 8) {
+    return res.status(400).json({ error: 'New password must be at least 8 characters' });
+  }
+
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.session.userId);
+  if (!user || !bcrypt.compareSync(current_password, user.password_hash)) {
+    return res.status(401).json({ error: 'Current password is incorrect' });
+  }
+
+  const password_hash = bcrypt.hashSync(new_password, BCRYPT_COST);
+  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(password_hash, user.id);
+
+  // Other devices/sessions logged into this account now need the new
+  // password — but keep this session (the one making the change) alive.
+  sessionStore.invalidateUser(user.id, req.sessionID);
+
+  res.json({ ok: true });
 });
 
 module.exports = router;

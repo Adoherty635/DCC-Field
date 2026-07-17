@@ -1,13 +1,12 @@
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { api } from '../../api/client.js';
+import DocumentGrid from '../DocumentGrid.jsx';
 
 export default function ScopeTab({ project, isAdmin, onUpdated }) {
   const [spanish, setSpanish] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(project.scope);
   const [saving, setSaving] = useState(false);
-  const [uploadingDoc, setUploadingDoc] = useState(false);
-  const fileInput = useRef(null);
 
   const save = async () => {
     setSaving(true);
@@ -21,29 +20,6 @@ export default function ScopeTab({ project, isAdmin, onUpdated }) {
     } finally {
       setSaving(false);
     }
-  };
-
-  const attachDoc = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploadingDoc(true);
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      const updated = await api.post(`/projects/${project.id}/scope-doc`, formData);
-      onUpdated(updated);
-    } catch (err) {
-      alert(err.message);
-    } finally {
-      setUploadingDoc(false);
-      if (fileInput.current) fileInput.current.value = '';
-    }
-  };
-
-  const removeDoc = async () => {
-    if (!confirm('Remove the attached scope document?')) return;
-    const updated = await api.delete(`/projects/${project.id}/scope-doc`);
-    onUpdated(updated);
   };
 
   const text = spanish ? project.scope_es : project.scope;
@@ -81,36 +57,8 @@ export default function ScopeTab({ project, isAdmin, onUpdated }) {
       )}
 
       <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
-        {project.scope_doc_name ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            <a
-              className="btn btn-secondary"
-              href={`/api/projects/${project.id}/scope-doc`}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              📎 {project.scope_doc_name}
-            </a>
-            {isAdmin && (
-              <button className="btn btn-danger" onClick={removeDoc}>Remove</button>
-            )}
-          </div>
-        ) : (
-          <div className="empty-state" style={{ padding: 0, textAlign: 'left' }}>No document attached.</div>
-        )}
-
-        {isAdmin && (
-          <label className="upload-btn" style={{ marginTop: 10 }}>
-            {uploadingDoc ? 'Uploading…' : project.scope_doc_name ? '📎 Replace document' : '📎 Attach document'}
-            <input
-              ref={fileInput}
-              type="file"
-              accept="application/pdf,image/jpeg,image/png,image/webp,image/heic"
-              onChange={attachDoc}
-              disabled={uploadingDoc}
-            />
-          </label>
-        )}
+        <h3 style={{ marginTop: 0 }}>Attachments</h3>
+        <DocumentGrid projectId={project.id} category="scope" isAdmin={isAdmin} itemLabel="document" />
       </div>
     </div>
   );

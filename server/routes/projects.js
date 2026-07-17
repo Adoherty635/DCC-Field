@@ -1,30 +1,17 @@
 const express = require('express');
-const fs = require('fs');
-const path = require('path');
-const crypto = require('crypto');
 const db = require('../db');
-const config = require('../config');
 const { requireAuth, requireAdmin, requireProjectAccess } = require('../middleware/auth');
 const { notify } = require('../services/notify');
 const { translateToSpanish } = require('../services/translate');
 const asyncHandler = require('../middleware/asyncHandler');
-const uploadDoc = require('../middleware/uploadDoc');
 
 const router = express.Router();
-
-const EXT_BY_MIME = {
-  'application/pdf': '.pdf',
-  'image/jpeg': '.jpg',
-  'image/png': '.png',
-  'image/webp': '.webp',
-  'image/heic': '.heic',
-};
 
 function withCounts(project) {
   const counts = db
     .prepare(
       `SELECT
-        (SELECT COUNT(*) FROM photos WHERE project_id = ? AND kind IN ('picture','rendering')) AS pictures,
+        (SELECT COUNT(*) FROM photos WHERE project_id = ? AND kind = 'picture') AS pictures,
         (SELECT COUNT(*) FROM notes WHERE project_id = ?) AS notes,
         (SELECT COUNT(*) FROM colors WHERE project_id = ?) AS colors,
         (SELECT COUNT(*) FROM orders WHERE project_id = ?) AS orders,
@@ -181,59 +168,5 @@ router.patch('/:id', requireAuth, requireAdmin, requireProjectAccess(db), asyncH
 
   res.json(withCounts(updated));
 }));
-
-router.post(
-  '/:id/scope-doc',
-  requireAuth,
-  requireAdmin,
-  requireProjectAccess(db),
-  uploadDoc.single('file'),
-  asyncHandler(async (req, res) => {
-    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-
-    const project = req.project;
-    const ext = EXT_BY_MIME[req.file.mimetype] || '';
-    const fileName = `${crypto.randomBytes(16).toString('hex')}${ext}`;
-    fs.writeFileSync(path.join(config.uploadsPath, fileName), req.file.buffer);
-
-    if (project.scope_doc_path) {
-      fs.unlink(path.join(config.uploadsPath, project.scope_doc_path), () => {});
-    }
-
-    db.prepare(
-      'UPDATE projects SET scope_doc_path = ?, scope_doc_name = ?, scope_doc_mime = ? WHERE id = ?'
-    ).run(fileName, req.file.originalname, req.file.mimetype, project.id);
-
-    await notify(project.crew_id, 'scope', `Scope document attached to ${project.name}`, project.id);
-
-    const updated = db.prepare('SELECT * FROM projects WHERE id = ?').get(project.id);
-    res.status(201).json(withCounts(updated));
-  })
-);
-
-router.get('/:id/scope-doc', requireAuth, requireProjectAccess(db), (req, res) => {
-  const project = req.project;
-  if (!project.scope_doc_path) return res.status(404).json({ error: 'No document attached' });
-
-  res.setHeader('Content-Type', project.scope_doc_mime || 'application/octet-stream');
-  res.setHeader(
-    'Content-Disposition',
-    `inline; filename="${(project.scope_doc_name || 'scope-document').replace(/"/g, '')}"`
-  );
-  res.sendFile(path.join(config.uploadsPath, project.scope_doc_path));
-});
-
-router.delete('/:id/scope-doc', requireAuth, requireAdmin, requireProjectAccess(db), (req, res) => {
-  const project = req.project;
-  if (project.scope_doc_path) {
-    fs.unlink(path.join(config.uploadsPath, project.scope_doc_path), () => {});
-  }
-  db.prepare(
-    'UPDATE projects SET scope_doc_path = NULL, scope_doc_name = NULL, scope_doc_mime = NULL WHERE id = ?'
-  ).run(project.id);
-
-  const updated = db.prepare('SELECT * FROM projects WHERE id = ?').get(project.id);
-  res.json(withCounts(updated));
-});
 
 module.exports = router;

@@ -464,6 +464,47 @@ textarea.scope-editor {
   text-align: left;
 }
 
+.doc-file-tile {
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  text-decoration: none;
+  color: var(--text);
+  padding: 8px;
+  text-align: center;
+}
+
+.doc-file-icon { font-size: 2rem; line-height: 1; }
+
+.doc-file-name {
+  font-size: 0.7rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.doc-delete-btn {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: none;
+  background: var(--danger);
+  color: #fff;
+  font-size: 0.9rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .upload-btn {
   display: inline-flex;
   align-items: center;

@@ -65,7 +65,7 @@ export default function ProjectDetailPage() {
       case 'scope': return <ScopeTab project={project} isAdmin={isAdmin} onUpdated={setProject} />;
       case 'pictures': return <PicturesTab projectId={project.id} isAdmin={isAdmin} onCountChange={(d) => bumpCount('pictures', d)} />;
       case 'notes': return <NotesTab projectId={project.id} onCountChange={(d) => bumpCount('notes', d)} />;
-      case 'colors': return <ColorsTab projectId={project.id} isAdmin={isAdmin} onCountChange={(d) => bumpCount('colors', d)} onPictureCountChange={(d) => bumpCount('pictures', d)} />;
+      case 'colors': return <ColorsTab projectId={project.id} isAdmin={isAdmin} onCountChange={(d) => bumpCount('colors', d)} />;
       case 'orders': return <OrdersTab projectId={project.id} isAdmin={isAdmin} onCountChange={(d) => bumpCount('orders', d)} />;
       case 'receipts': return <ReceiptsTab projectId={project.id} isAdmin={isAdmin} onCountChange={(d) => bumpCount('receipts', d)} />;
       default: return null;

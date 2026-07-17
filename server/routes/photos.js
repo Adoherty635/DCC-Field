@@ -7,14 +7,14 @@ const db = require('../db');
 const config = require('../config');
 const upload = require('../middleware/upload');
 const { requireAuth, requireAdmin, requireProjectAccess } = require('../middleware/auth');
-const { notify, notifyBatched } = require('../services/notify');
+const { notifyBatched } = require('../services/notify');
 const { getAdminUserIds } = require('../services/recipients');
 const asyncHandler = require('../middleware/asyncHandler');
 
 const router = express.Router({ mergeParams: true });
 
-const KIND_TO_CATEGORY = { picture: 'photo', receipt: 'receipt', rendering: 'color' };
-const KIND_LABEL = { picture: 'photo', receipt: 'receipt', rendering: 'rendering' };
+const KIND_TO_CATEGORY = { picture: 'photo', receipt: 'receipt' };
+const KIND_LABEL = { picture: 'photo', receipt: 'receipt' };
 
 async function saveImage(buffer) {
   const id = crypto.randomBytes(16).toString('hex');
@@ -59,11 +59,8 @@ router.get('/', requireAuth, requireProjectAccess(db), (req, res) => {
 
 router.post('/', requireAuth, requireProjectAccess(db), upload.array('files', 20), asyncHandler(async (req, res) => {
   const kind = req.body.kind || 'picture';
-  if (!['picture', 'receipt', 'rendering'].includes(kind)) {
+  if (!['picture', 'receipt'].includes(kind)) {
     return res.status(400).json({ error: 'Invalid kind' });
-  }
-  if (kind === 'rendering' && req.session.role !== 'admin') {
-    return res.status(403).json({ error: 'Admin only' });
   }
   if (!req.files || !req.files.length) {
     return res.status(400).json({ error: 'No files uploaded' });
@@ -85,9 +82,7 @@ router.post('/', requireAuth, requireProjectAccess(db), upload.array('files', 20
   const itemLabel = KIND_LABEL[kind];
   const actor = db.prepare('SELECT short_name FROM users WHERE id = ?').get(req.session.userId);
 
-  if (kind === 'rendering') {
-    await notify(project.crew_id, 'color', `Rendering added to ${project.name}`, project.id);
-  } else if (req.session.role === 'admin') {
+  if (req.session.role === 'admin') {
     notifyBatched(project.crew_id, category, project.id, actor.short_name, itemLabel);
   } else {
     for (const adminId of getAdminUserIds()) {

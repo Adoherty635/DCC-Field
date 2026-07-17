@@ -77,6 +77,18 @@ CREATE TABLE IF NOT EXISTS photos (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS documents (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  author_id INTEGER NOT NULL REFERENCES users(id),
+  category TEXT NOT NULL CHECK (category IN ('scope', 'rendering')),
+  file_path TEXT NOT NULL,
+  thumb_path TEXT,
+  original_name TEXT,
+  mime TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -111,6 +123,7 @@ CREATE INDEX IF NOT EXISTS idx_colors_project ON colors(project_id);
 CREATE INDEX IF NOT EXISTS idx_orders_project ON orders(project_id);
 CREATE INDEX IF NOT EXISTS idx_notes_project ON notes(project_id);
 CREATE INDEX IF NOT EXISTS idx_photos_project ON photos(project_id, kind);
+CREATE INDEX IF NOT EXISTS idx_documents_project ON documents(project_id, category);
 CREATE INDEX IF NOT EXISTS idx_events_project ON events(project_id);
 CREATE INDEX IF NOT EXISTS idx_events_crew_date ON events(crew_id, date);
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, read);

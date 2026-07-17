@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../api/client.js';
 import Modal from '../Modal.jsx';
-import PhotoGrid from '../PhotoGrid.jsx';
+import DocumentGrid from '../DocumentGrid.jsx';
 
 function AddColorModal({ projectId, onClose, onCreated }) {
   const [form, setForm] = useState({ manufacturer: '', name: '', code: '', hex: '#c7791b', sheen: '', location_note: '' });
@@ -60,7 +60,7 @@ function AddColorModal({ projectId, onClose, onCreated }) {
   );
 }
 
-export default function ColorsTab({ projectId, isAdmin, onCountChange, onPictureCountChange }) {
+export default function ColorsTab({ projectId, isAdmin, onCountChange }) {
   const [colors, setColors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
@@ -97,7 +97,7 @@ export default function ColorsTab({ projectId, isAdmin, onCountChange, onPicture
       )}
 
       <h3 style={{ marginTop: 24 }}>Renderings</h3>
-      <PhotoGrid projectId={projectId} kind="rendering" canUpload={isAdmin} canDelete={isAdmin} onCountChange={onPictureCountChange} />
+      <DocumentGrid projectId={projectId} category="rendering" isAdmin={isAdmin} itemLabel="rendering" />
 
       {showAdd && (
         <AddColorModal

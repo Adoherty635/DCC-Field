@@ -2,27 +2,47 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../../api/client.js';
 import Modal from '../Modal.jsx';
 import DocumentGrid from '../DocumentGrid.jsx';
+import ColorSwatchPicker from '../ColorSwatchPicker.jsx';
+
+const CATALOG_MANUFACTURERS = ['Sherwin-Williams'];
 
 function ColorFormModal({ projectId, color, onClose, onSaved }) {
+  const [manufacturerChoice, setManufacturerChoice] = useState(() => {
+    if (color?.manufacturer && CATALOG_MANUFACTURERS.includes(color.manufacturer)) return color.manufacturer;
+    return color?.manufacturer ? 'Other' : CATALOG_MANUFACTURERS[0];
+  });
+  const [customManufacturer, setCustomManufacturer] = useState(
+    color?.manufacturer && !CATALOG_MANUFACTURERS.includes(color.manufacturer) ? color.manufacturer : ''
+  );
   const [form, setForm] = useState({
-    manufacturer: color?.manufacturer || '',
     name: color?.name || '',
     code: color?.code || '',
     hex: color?.hex || '#c7791b',
+    product: color?.product || '',
     sheen: color?.sheen || '',
     location_note: color?.location_note || '',
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
+  const isCatalog = CATALOG_MANUFACTURERS.includes(manufacturerChoice);
+
   const submit = async (e) => {
     e.preventDefault();
-    setBusy(true);
     setError('');
+    if (isCatalog && !form.code) {
+      setError('Search for and select a color first.');
+      return;
+    }
+    setBusy(true);
     try {
+      const payload = {
+        ...form,
+        manufacturer: manufacturerChoice === 'Other' ? customManufacturer : manufacturerChoice,
+      };
       const saved = color
-        ? await api.patch(`/projects/${projectId}/colors/${color.id}`, form)
-        : await api.post(`/projects/${projectId}/colors`, form);
+        ? await api.patch(`/projects/${projectId}/colors/${color.id}`, payload)
+        : await api.post(`/projects/${projectId}/colors`, payload);
       onSaved(saved);
     } catch (err) {
       setError(err.message);
@@ -37,19 +57,48 @@ function ColorFormModal({ projectId, color, onClose, onSaved }) {
       <form onSubmit={submit}>
         <div className="field">
           <label>Manufacturer</label>
-          <input value={form.manufacturer} onChange={(e) => setForm({ ...form, manufacturer: e.target.value })} />
+          <select
+            value={manufacturerChoice}
+            onChange={(e) => { setManufacturerChoice(e.target.value); setForm({ ...form, name: '', code: '', hex: '#c7791b' }); }}
+          >
+            {CATALOG_MANUFACTURERS.map((m) => <option key={m} value={m}>{m}</option>)}
+            <option value="Other">Other</option>
+          </select>
         </div>
+
+        {manufacturerChoice === 'Other' && (
+          <div className="field">
+            <label>Manufacturer name</label>
+            <input value={customManufacturer} onChange={(e) => setCustomManufacturer(e.target.value)} placeholder="e.g. Behr" />
+          </div>
+        )}
+
+        {isCatalog ? (
+          <ColorSwatchPicker
+            manufacturer={manufacturerChoice}
+            value={form.code ? { code: form.code, name: form.name, hex: form.hex } : null}
+            onSelect={(c) => setForm({ ...form, name: c.name, code: c.code, hex: c.hex })}
+          />
+        ) : (
+          <>
+            <div className="field">
+              <label>Name</label>
+              <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            </div>
+            <div className="field">
+              <label>Code</label>
+              <input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} placeholder="e.g. SW 7029" />
+            </div>
+            <div className="field">
+              <label>Swatch color</label>
+              <input type="color" value={form.hex} onChange={(e) => setForm({ ...form, hex: e.target.value })} />
+            </div>
+          </>
+        )}
+
         <div className="field">
-          <label>Name</label>
-          <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-        </div>
-        <div className="field">
-          <label>Code</label>
-          <input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} placeholder="e.g. SW 7029" />
-        </div>
-        <div className="field">
-          <label>Swatch color</label>
-          <input type="color" value={form.hex} onChange={(e) => setForm({ ...form, hex: e.target.value })} />
+          <label>Product</label>
+          <input value={form.product} onChange={(e) => setForm({ ...form, product: e.target.value })} placeholder="e.g. Duration Exterior" />
         </div>
         <div className="field">
           <label>Sheen</label>
@@ -57,7 +106,7 @@ function ColorFormModal({ projectId, color, onClose, onSaved }) {
         </div>
         <div className="field">
           <label>Location / use</label>
-          <input value={form.location_note} onChange={(e) => setForm({ ...form, location_note: e.target.value })} placeholder="e.g. Lobby walls" />
+          <input value={form.location_note} onChange={(e) => setForm({ ...form, location_note: e.target.value })} placeholder="e.g. Body, Accent, Trim" />
         </div>
         {error && <div className="login-error" style={{ color: '#b3261e' }}>{error}</div>}
         <div className="modal-actions">
@@ -107,6 +156,7 @@ export default function ColorsTab({ projectId, isAdmin, onCountChange }) {
               <div style={{ flex: 1 }}>
                 <div className="name">{c.name || c.code}</div>
                 <div className="sub">{[c.manufacturer, c.code].filter(Boolean).join(' · ')}</div>
+                {c.product && <div className="sub">{c.product}</div>}
                 <div className="sub">{c.sheen}</div>
                 {c.location_note && <div className="sub">{c.location_note}</div>}
                 {isAdmin && (

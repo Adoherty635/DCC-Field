@@ -14,15 +14,15 @@ router.get('/', requireAuth, requireProjectAccess(db), (req, res) => {
 });
 
 router.post('/', requireAuth, requireAdmin, requireProjectAccess(db), asyncHandler(async (req, res) => {
-  const { manufacturer, name, code, hex, sheen, location_note } = req.body || {};
+  const { manufacturer, name, code, hex, product, sheen, location_note } = req.body || {};
   if (!name && !code) return res.status(400).json({ error: 'name or code required' });
 
   const info = db
     .prepare(
-      `INSERT INTO colors (project_id, manufacturer, name, code, hex, sheen, location_note)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO colors (project_id, manufacturer, name, code, hex, product, sheen, location_note)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     )
-    .run(req.project.id, manufacturer || '', name || '', code || '', hex || '', sheen || '', location_note || '');
+    .run(req.project.id, manufacturer || '', name || '', code || '', hex || '', product || '', sheen || '', location_note || '');
 
   const color = db.prepare('SELECT * FROM colors WHERE id = ?').get(info.lastInsertRowid);
 
@@ -35,15 +35,16 @@ router.patch('/:colorId', requireAuth, requireAdmin, requireProjectAccess(db), (
   const existing = db.prepare('SELECT * FROM colors WHERE id = ? AND project_id = ?').get(req.params.colorId, req.project.id);
   if (!existing) return res.status(404).json({ error: 'Not found' });
 
-  const { manufacturer, name, code, hex, sheen, location_note } = req.body || {};
+  const { manufacturer, name, code, hex, product, sheen, location_note } = req.body || {};
 
   db.prepare(
-    `UPDATE colors SET manufacturer = ?, name = ?, code = ?, hex = ?, sheen = ?, location_note = ? WHERE id = ?`
+    `UPDATE colors SET manufacturer = ?, name = ?, code = ?, hex = ?, product = ?, sheen = ?, location_note = ? WHERE id = ?`
   ).run(
     manufacturer !== undefined ? manufacturer : existing.manufacturer,
     name !== undefined ? name : existing.name,
     code !== undefined ? code : existing.code,
     hex !== undefined ? hex : existing.hex,
+    product !== undefined ? product : existing.product,
     sheen !== undefined ? sheen : existing.sheen,
     location_note !== undefined ? location_note : existing.location_note,
     existing.id

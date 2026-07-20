@@ -32,6 +32,7 @@ ensureColumn('projects', 'start_date', 'TEXT');
 ensureColumn('projects', 'end_date', 'TEXT');
 ensureColumn('events', 'auto_type', 'TEXT');
 ensureColumn('projects', 'punch_list', "TEXT NOT NULL DEFAULT ''");
+ensureColumn('colors', 'product', 'TEXT');
 
 // SQLite can't ALTER a CHECK constraint in place — a database created before
 // 'punch_list' was a valid documents.category needs the table rebuilt (data

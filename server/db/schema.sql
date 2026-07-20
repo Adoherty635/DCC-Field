@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS colors (
   name TEXT,
   code TEXT,
   hex TEXT,
+  product TEXT,
   sheen TEXT,
   location_note TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))

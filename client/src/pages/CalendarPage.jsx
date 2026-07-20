@@ -165,7 +165,7 @@ export default function CalendarPage() {
               return (
                 <button
                   key={key}
-                  className={`calendar-cell ${outOfMonth ? 'out-of-month' : ''} ${key === todayKey ? 'today' : ''}`}
+                  className={`calendar-cell ${outOfMonth ? 'out-of-month' : ''} ${key === todayKey ? 'today' : ''} ${key === selectedDay ? 'selected' : ''}`}
                   onClick={() => setSelectedDay(key)}
                 >
                   <span className="day-num">{d.getDate()}</span>

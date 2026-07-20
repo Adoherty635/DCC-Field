@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 
 const CATALOG_URLS = {
   'Sherwin-Williams': '/color-catalogs/sherwin-williams.json',
+  'Benjamin Moore': '/color-catalogs/benjamin-moore.json',
 };
 
 const catalogCache = {};

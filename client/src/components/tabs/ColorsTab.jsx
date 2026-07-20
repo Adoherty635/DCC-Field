@@ -4,7 +4,7 @@ import Modal from '../Modal.jsx';
 import DocumentGrid from '../DocumentGrid.jsx';
 import ColorSwatchPicker from '../ColorSwatchPicker.jsx';
 
-const CATALOG_MANUFACTURERS = ['Sherwin-Williams'];
+const CATALOG_MANUFACTURERS = ['Sherwin-Williams', 'Benjamin Moore'];
 
 function ColorFormModal({ projectId, color, onClose, onSaved }) {
   const [manufacturerChoice, setManufacturerChoice] = useState(() => {

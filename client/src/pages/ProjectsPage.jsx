@@ -121,12 +121,14 @@ function NewProjectModal({ crews, onClose, onCreated }) {
   );
 }
 
+const STATUSES = ['Scheduled', 'In progress', 'Complete'];
+
 export default function ProjectsPage() {
   const { user } = useAuth();
   const [projects, setProjects] = useState([]);
   const [crews, setCrews] = useState([]);
   const [crewFilter, setCrewFilter] = useState(null);
-  const [showArchived, setShowArchived] = useState(false);
+  const [statusFilter, setStatusFilter] = useState('In progress');
   const [showNew, setShowNew] = useState(false);
   const [editingProject, setEditingProject] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -146,9 +148,8 @@ export default function ProjectsPage() {
 
   if (loading) return <div className="page"><div className="loading-state">Loading projects…</div></div>;
 
-  const visible = crewFilter ? projects.filter((p) => p.crew_id === crewFilter) : projects;
-  const active = visible.filter((p) => p.status !== 'Complete');
-  const archived = visible.filter((p) => p.status === 'Complete');
+  const byCrew = crewFilter ? projects.filter((p) => p.crew_id === crewFilter) : projects;
+  const visible = byCrew.filter((p) => p.status === statusFilter);
 
   return (
     <div className="page">
@@ -157,6 +158,14 @@ export default function ProjectsPage() {
         {user.role === 'admin' && (
           <button className="btn btn-primary" onClick={() => setShowNew(true)}>+ New project</button>
         )}
+      </div>
+
+      <div className="crew-filter">
+        {STATUSES.map((s) => (
+          <button key={s} className={statusFilter === s ? 'active' : ''} onClick={() => setStatusFilter(s)}>
+            {s}
+          </button>
+        ))}
       </div>
 
       {user.role === 'admin' && crews.length > 0 && (
@@ -170,29 +179,14 @@ export default function ProjectsPage() {
         </div>
       )}
 
-      {active.length === 0 ? (
-        <div className="empty-state">No projects yet.</div>
+      {visible.length === 0 ? (
+        <div className="empty-state">No {statusFilter.toLowerCase()} projects.</div>
       ) : (
         <div className="project-list">
-          {active.map((p) => (
+          {visible.map((p) => (
             <ProjectCard key={p.id} project={p} isAdmin={user.role === 'admin'} onEdit={setEditingProject} />
           ))}
         </div>
-      )}
-
-      {archived.length > 0 && (
-        <>
-          <button className="archived-toggle" onClick={() => setShowArchived((v) => !v)}>
-            {showArchived ? '▾' : '▸'} Archived ({archived.length})
-          </button>
-          {showArchived && (
-            <div className="project-list">
-              {archived.map((p) => (
-                <ProjectCard key={p.id} project={p} isAdmin={user.role === 'admin'} onEdit={setEditingProject} />
-              ))}
-            </div>
-          )}
-        </>
       )}
 
       {showNew && (
@@ -202,6 +196,7 @@ export default function ProjectsPage() {
           onCreated={(project) => {
             setShowNew(false);
             setProjects((prev) => [project, ...prev]);
+            setStatusFilter(project.status);
           }}
         />
       )}

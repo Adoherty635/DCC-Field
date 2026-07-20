@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext.jsx';
 import { api } from '../api/client.js';
 import Chip from '../components/Chip.jsx';
+import Modal from '../components/Modal.jsx';
 import EditProjectModal from '../components/EditProjectModal.jsx';
 import ScopeTab from '../components/tabs/ScopeTab.jsx';
 import PicturesTab from '../components/tabs/PicturesTab.jsx';
@@ -26,6 +27,36 @@ function statusClass(status) {
   return `status-pill status-${status.replace(/\s+/g, '-')}`;
 }
 
+function ConfirmCompleteModal({ onClose, onConfirm }) {
+  const [busy, setBusy] = useState(false);
+
+  const confirm = async () => {
+    setBusy(true);
+    try {
+      await onConfirm();
+      onClose();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal onClose={onClose}>
+      <h2 style={{ marginTop: 0 }}>Mark project complete?</h2>
+      <p>
+        Have you confirmed all close-out attachments, the punch list, and everything else on
+        this project are finished?
+      </p>
+      <div className="modal-actions">
+        <button type="button" className="btn btn-secondary" disabled={busy} onClick={onClose}>No</button>
+        <button type="button" className="btn btn-primary" disabled={busy} onClick={confirm}>
+          {busy ? 'Saving…' : 'Yes'}
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
 export default function ProjectDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -37,6 +68,7 @@ export default function ProjectDetailPage() {
   const [error, setError] = useState('');
   const [changingCrew, setChangingCrew] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
+  const [confirmingComplete, setConfirmingComplete] = useState(false);
 
   const load = async () => {
     try {
@@ -58,6 +90,11 @@ export default function ProjectDetailPage() {
 
   const bumpCount = (key, delta) => {
     setProject((prev) => ({ ...prev, counts: { ...prev.counts, [key]: Math.max(0, prev.counts[key] + delta) } }));
+  };
+
+  const changeStatus = async (status) => {
+    const updated = await api.patch(`/projects/${id}`, { status });
+    setProject(updated);
   };
 
   if (loading) return <div className="page"><div className="loading-state">Loading…</div></div>;
@@ -105,9 +142,13 @@ export default function ProjectDetailPage() {
           {isAdmin && (
             <select
               value={project.status}
-              onChange={async (e) => {
-                const updated = await api.patch(`/projects/${project.id}`, { status: e.target.value });
-                setProject(updated);
+              onChange={(e) => {
+                const nextStatus = e.target.value;
+                if (nextStatus === 'Complete' && project.status !== 'Complete') {
+                  setConfirmingComplete(true);
+                } else {
+                  changeStatus(nextStatus);
+                }
               }}
             >
               <option>Scheduled</option>
@@ -194,6 +235,13 @@ export default function ProjectDetailPage() {
           onClose={() => setShowEdit(false)}
           onSaved={(updated) => { setProject(updated); setShowEdit(false); }}
           onDeleted={() => navigate('/')}
+        />
+      )}
+
+      {confirmingComplete && (
+        <ConfirmCompleteModal
+          onClose={() => setConfirmingComplete(false)}
+          onConfirm={() => changeStatus('Complete')}
         />
       )}
     </div>

@@ -325,16 +325,6 @@ a { color: inherit; }
 .status-In.progress, .status-In-progress { background: #fff3d6; color: #8a5b00; }
 .status-Complete { background: #e4f4ea; color: #206640; }
 
-.archived-toggle {
-  margin-top: 18px;
-  font-weight: 700;
-  font-size: 0.9rem;
-  cursor: pointer;
-  color: var(--text-muted);
-  background: none;
-  border: none;
-  padding: 8px 0;
-}
 
 /* Tabs (project detail) */
 .detail-layout {

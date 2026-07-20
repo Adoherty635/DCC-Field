@@ -3,8 +3,15 @@ import { api } from '../../api/client.js';
 import Modal from '../Modal.jsx';
 import DocumentGrid from '../DocumentGrid.jsx';
 
-function AddColorModal({ projectId, onClose, onCreated }) {
-  const [form, setForm] = useState({ manufacturer: '', name: '', code: '', hex: '#c7791b', sheen: '', location_note: '' });
+function ColorFormModal({ projectId, color, onClose, onSaved }) {
+  const [form, setForm] = useState({
+    manufacturer: color?.manufacturer || '',
+    name: color?.name || '',
+    code: color?.code || '',
+    hex: color?.hex || '#c7791b',
+    sheen: color?.sheen || '',
+    location_note: color?.location_note || '',
+  });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -13,8 +20,10 @@ function AddColorModal({ projectId, onClose, onCreated }) {
     setBusy(true);
     setError('');
     try {
-      const color = await api.post(`/projects/${projectId}/colors`, form);
-      onCreated(color);
+      const saved = color
+        ? await api.patch(`/projects/${projectId}/colors/${color.id}`, form)
+        : await api.post(`/projects/${projectId}/colors`, form);
+      onSaved(saved);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -24,7 +33,7 @@ function AddColorModal({ projectId, onClose, onCreated }) {
 
   return (
     <Modal onClose={onClose}>
-      <h2 style={{ marginTop: 0 }}>Add color</h2>
+      <h2 style={{ marginTop: 0 }}>{color ? 'Edit color' : 'Add color'}</h2>
       <form onSubmit={submit}>
         <div className="field">
           <label>Manufacturer</label>
@@ -53,7 +62,9 @@ function AddColorModal({ projectId, onClose, onCreated }) {
         {error && <div className="login-error" style={{ color: '#b3261e' }}>{error}</div>}
         <div className="modal-actions">
           <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
-          <button type="submit" className="btn btn-primary" disabled={busy}>{busy ? 'Adding…' : 'Add'}</button>
+          <button type="submit" className="btn btn-primary" disabled={busy}>
+            {busy ? 'Saving…' : color ? 'Save' : 'Add'}
+          </button>
         </div>
       </form>
     </Modal>
@@ -64,10 +75,18 @@ export default function ColorsTab({ projectId, isAdmin, onCountChange }) {
   const [colors, setColors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
+  const [editingColor, setEditingColor] = useState(null);
 
   useEffect(() => {
     api.get(`/projects/${projectId}/colors`).then((rows) => { setColors(rows); setLoading(false); });
   }, [projectId]);
+
+  const remove = async (colorId) => {
+    if (!confirm('Delete this color?')) return;
+    await api.delete(`/projects/${projectId}/colors/${colorId}`);
+    setColors((prev) => prev.filter((c) => c.id !== colorId));
+    onCountChange && onCountChange(-1);
+  };
 
   if (loading) return <div className="loading-state">Loading…</div>;
 
@@ -85,11 +104,17 @@ export default function ColorsTab({ projectId, isAdmin, onCountChange }) {
           {colors.map((c) => (
             <div key={c.id} className="color-card">
               <div className="color-swatch" style={{ background: c.hex || '#ccc' }} />
-              <div>
+              <div style={{ flex: 1 }}>
                 <div className="name">{c.name || c.code}</div>
                 <div className="sub">{[c.manufacturer, c.code].filter(Boolean).join(' · ')}</div>
                 <div className="sub">{c.sheen}</div>
                 {c.location_note && <div className="sub">{c.location_note}</div>}
+                {isAdmin && (
+                  <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                    <button className="card-edit-btn" onClick={() => setEditingColor(c)}>Edit</button>
+                    <button className="card-edit-btn" onClick={() => remove(c.id)}>Delete</button>
+                  </div>
+                )}
               </div>
             </div>
           ))}
@@ -100,13 +125,25 @@ export default function ColorsTab({ projectId, isAdmin, onCountChange }) {
       <DocumentGrid projectId={projectId} category="rendering" isAdmin={isAdmin} itemLabel="rendering" />
 
       {showAdd && (
-        <AddColorModal
+        <ColorFormModal
           projectId={projectId}
           onClose={() => setShowAdd(false)}
-          onCreated={(color) => {
+          onSaved={(color) => {
             setColors((prev) => [...prev, color]);
             setShowAdd(false);
             onCountChange && onCountChange(1);
+          }}
+        />
+      )}
+
+      {editingColor && (
+        <ColorFormModal
+          projectId={projectId}
+          color={editingColor}
+          onClose={() => setEditingColor(null)}
+          onSaved={(updated) => {
+            setColors((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+            setEditingColor(null);
           }}
         />
       )}

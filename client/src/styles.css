@@ -50,6 +50,9 @@ a { color: inherit; }
   align-items: center;
   justify-content: space-between;
   padding: 12px 16px;
+  /* iPhone notch/status-bar clearance when installed to the home screen —
+     evaluates to 0 on devices/browsers without a safe-area inset. */
+  padding-top: calc(12px + env(safe-area-inset-top, 0px));
   gap: 12px;
 }
 

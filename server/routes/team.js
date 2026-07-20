@@ -49,8 +49,10 @@ router.get('/', requireAuth, requireAdmin, (req, res) => {
 });
 
 router.post('/', requireAuth, requireAdmin, (req, res) => {
-  const { display_name, short_name, chip_color, phone } = req.body || {};
+  const { display_name, short_name, chip_color, phone, role } = req.body || {};
   if (!display_name) return res.status(400).json({ error: 'display_name required' });
+
+  const nextRole = role === 'admin' ? 'admin' : 'crew';
 
   const username = slugUsername(display_name);
   const password = randomPassword();
@@ -59,13 +61,13 @@ router.post('/', requireAuth, requireAdmin, (req, res) => {
   const info = db
     .prepare(
       `INSERT INTO users (username, password_hash, display_name, short_name, role, chip_color, phone, active)
-       VALUES (?, ?, ?, ?, 'crew', ?, ?, 1)`
+       VALUES (?, ?, ?, ?, ?, ?, ?, 1)`
     )
-    .run(username, password_hash, display_name, short_name || display_name, chip_color || '#5B4FBF', phone || null);
+    .run(username, password_hash, display_name, short_name || display_name, nextRole, chip_color || '#5B4FBF', phone || null);
 
   const userId = info.lastInsertRowid;
   const insertPref = db.prepare('INSERT INTO alert_prefs (user_id, category, enabled) VALUES (?, ?, ?)');
-  for (const pref of defaultPrefsFor('crew')) insertPref.run(userId, pref.category, pref.enabled);
+  for (const pref of defaultPrefsFor(nextRole)) insertPref.run(userId, pref.category, pref.enabled);
 
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
   res.status(201).json({ ...withPrefs(user), temp_password: password });

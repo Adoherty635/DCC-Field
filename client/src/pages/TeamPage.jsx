@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../api/client.js';
+import { useAuth } from '../AuthContext.jsx';
 import Chip from '../components/Chip.jsx';
 import Modal from '../components/Modal.jsx';
 
 const ALERT_CATEGORIES = ['schedule', 'project', 'scope', 'color', 'order', 'photo', 'note', 'receipt'];
 
-function AddCrewModal({ onClose, onCreated }) {
-  const [form, setForm] = useState({ display_name: '', short_name: '', chip_color: '#5B4FBF', phone: '' });
+function AddUserModal({ onClose, onCreated }) {
+  const [form, setForm] = useState({ display_name: '', short_name: '', chip_color: '#5B4FBF', phone: '', role: 'crew' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -26,10 +27,17 @@ function AddCrewModal({ onClose, onCreated }) {
 
   return (
     <Modal onClose={onClose}>
-      <h2 style={{ marginTop: 0 }}>Add crew</h2>
+      <h2 style={{ marginTop: 0 }}>Add team member</h2>
       <form onSubmit={submit}>
         <div className="field">
-          <label>Crew name</label>
+          <label>Role</label>
+          <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
+            <option value="crew">Crew</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+        <div className="field">
+          <label>Name</label>
           <input required value={form.display_name} onChange={(e) => setForm({ ...form, display_name: e.target.value })} />
         </div>
         <div className="field">
@@ -54,7 +62,7 @@ function AddCrewModal({ onClose, onCreated }) {
   );
 }
 
-function TeamCard({ user, onChange }) {
+function TeamCard({ user, isSelf, onChange }) {
   const [phone, setPhone] = useState(user.phone || '');
   const [tempPassword, setTempPassword] = useState(null);
 
@@ -87,6 +95,7 @@ function TeamCard({ user, onChange }) {
         <Chip color={user.chip_color} label={user.short_name} />
         <div style={{ flex: 1 }}>
           <strong>{user.display_name}</strong>
+          {user.role === 'admin' && <span style={{ marginLeft: 8, color: 'var(--text-muted)', fontSize: '0.8rem' }}>(admin)</span>}
           {!user.active && <span style={{ marginLeft: 8, color: 'var(--text-muted)', fontSize: '0.8rem' }}>(deactivated)</span>}
         </div>
       </div>
@@ -119,7 +128,7 @@ function TeamCard({ user, onChange }) {
 
       <div className="team-actions">
         <button className="btn btn-secondary" onClick={resetPassword}>Reset password</button>
-        {user.role === 'crew' && (
+        {!isSelf && (
           <button className="btn btn-danger" onClick={deactivate}>{user.active ? 'Deactivate' : 'Reactivate'}</button>
         )}
       </div>
@@ -128,6 +137,7 @@ function TeamCard({ user, onChange }) {
 }
 
 export default function TeamPage() {
+  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
@@ -151,21 +161,23 @@ export default function TeamPage() {
     <div className="page">
       <div className="page-title-row">
         <h1>Team</h1>
-        <button className="btn btn-primary" onClick={() => setShowAdd(true)}>+ Add crew</button>
+        <button className="btn btn-primary" onClick={() => setShowAdd(true)}>+ Add team member</button>
       </div>
 
       {newTempPassword && (
         <div className="empty-state" style={{ background: '#eef1f4', borderRadius: 8, padding: 10, marginBottom: 12, textAlign: 'left' }}>
-          Temporary password for new crew (shown once): <strong>{newTempPassword}</strong>
+          Temporary password for new team member (shown once): <strong>{newTempPassword}</strong>
         </div>
       )}
 
       <div className="team-grid">
-        {users.map((u) => <TeamCard key={u.id} user={u} onChange={onChange} />)}
+        {users.map((u) => (
+          <TeamCard key={u.id} user={u} isSelf={u.id === currentUser.id} onChange={onChange} />
+        ))}
       </div>
 
       {showAdd && (
-        <AddCrewModal
+        <AddUserModal
           onClose={() => setShowAdd(false)}
           onCreated={(user) => {
             setUsers((prev) => [...prev, user]);

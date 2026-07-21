@@ -66,6 +66,7 @@ CREATE TABLE IF NOT EXISTS notes (
   author_id INTEGER NOT NULL REFERENCES users(id),
   body TEXT NOT NULL,
   body_es TEXT,
+  visibility TEXT NOT NULL DEFAULT 'everyone' CHECK (visibility IN ('admin', 'everyone')),
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -74,8 +75,11 @@ CREATE TABLE IF NOT EXISTS photos (
   project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   author_id INTEGER NOT NULL REFERENCES users(id),
   kind TEXT NOT NULL CHECK (kind IN ('picture','receipt','rendering')),
+  media_type TEXT NOT NULL DEFAULT 'image' CHECK (media_type IN ('image', 'video')),
   file_path TEXT NOT NULL,
-  thumb_path TEXT NOT NULL,
+  thumb_path TEXT,
+  mime TEXT,
+  caption TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

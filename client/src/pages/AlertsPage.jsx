@@ -20,11 +20,29 @@ export default function AlertsPage() {
     setAlerts((prev) => prev.map((a) => (a.id === id ? { ...a, read: 1 } : a)));
   };
 
+  const clearOne = async (e, id) => {
+    e.preventDefault();
+    e.stopPropagation();
+    await api.delete(`/notifications/${id}`);
+    setAlerts((prev) => prev.filter((a) => a.id !== id));
+  };
+
+  const clearAll = async () => {
+    if (!confirm('Clear all alerts?')) return;
+    await api.delete('/notifications');
+    setAlerts([]);
+  };
+
   if (loading) return <div className="page"><div className="loading-state">Loading…</div></div>;
 
   return (
     <div className="page">
-      <h1>Alerts</h1>
+      <div className="page-title-row">
+        <h1>Alerts</h1>
+        {alerts.length > 0 && (
+          <button className="btn btn-secondary" onClick={clearAll}>Clear all</button>
+        )}
+      </div>
       {alerts.length === 0 ? (
         <div className="empty-state">No alerts yet.</div>
       ) : (
@@ -37,6 +55,13 @@ export default function AlertsPage() {
                 <div className="alert-time">{formatWhen(a.created_at)}</div>
                 {a.sms_sent ? <span className="sent-badge">Text sent</span> : null}
               </div>
+              <button
+                className="alert-clear-btn"
+                aria-label="Clear alert"
+                onClick={(e) => clearOne(e, a.id)}
+              >
+                ×
+              </button>
             </>
           );
           return a.project_id ? (

@@ -33,6 +33,7 @@ function NoteItem({ note, projectId, onTranslated }) {
       <div className="note-head">
         <Chip color={note.author_chip_color} label={note.author_short_name} />
         <span className="timestamp">{formatWhen(note.created_at)}</span>
+        {note.visibility === 'admin' && <span className="badge">Admin only</span>}
       </div>
       <div className="note-body">{showEs ? note.body_es : note.body}</div>
       <button className={`toggle-es ${showEs ? 'active' : ''}`} style={{ marginTop: 8 }} onClick={toggle} disabled={loading}>
@@ -43,10 +44,11 @@ function NoteItem({ note, projectId, onTranslated }) {
   );
 }
 
-export default function NotesTab({ projectId, onCountChange }) {
+export default function NotesTab({ projectId, isAdmin, onCountChange }) {
   const [notes, setNotes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [body, setBody] = useState('');
+  const [visibility, setVisibility] = useState('everyone');
   const [posting, setPosting] = useState(false);
 
   const load = async () => {
@@ -62,9 +64,10 @@ export default function NotesTab({ projectId, onCountChange }) {
     if (!body.trim()) return;
     setPosting(true);
     try {
-      const note = await api.post(`/projects/${projectId}/notes`, { body });
+      const note = await api.post(`/projects/${projectId}/notes`, { body, visibility });
       setNotes((prev) => [...prev, note]);
       setBody('');
+      setVisibility('everyone');
       onCountChange && onCountChange(1);
     } catch (err) {
       alert(err.message);
@@ -90,13 +93,24 @@ export default function NotesTab({ projectId, onCountChange }) {
           ))}
         </div>
       )}
-      <form className="note-compose" onSubmit={post}>
-        <textarea
-          placeholder="Write a note…"
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-        />
-        <button className="btn btn-primary" type="submit" disabled={posting}>Post</button>
+      <form onSubmit={post}>
+        {isAdmin && (
+          <div className="field" style={{ marginTop: 14, marginBottom: 8, maxWidth: 200 }}>
+            <label>Visible to</label>
+            <select value={visibility} onChange={(e) => setVisibility(e.target.value)}>
+              <option value="everyone">Everyone</option>
+              <option value="admin">Admin only</option>
+            </select>
+          </div>
+        )}
+        <div className="note-compose" style={{ marginTop: isAdmin ? 0 : 14 }}>
+          <textarea
+            placeholder="Write a note…"
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+          />
+          <button className="btn btn-primary" type="submit" disabled={posting}>Post</button>
+        </div>
       </form>
     </div>
   );

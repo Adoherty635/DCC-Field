@@ -15,26 +15,33 @@ function noteSelect() {
 }
 
 router.get('/', requireAuth, requireProjectAccess(db), (req, res) => {
-  const rows = db
-    .prepare(`${noteSelect()} WHERE project_id = ? ORDER BY notes.created_at ASC`)
-    .all(req.project.id);
+  const rows = req.session.role === 'admin'
+    ? db.prepare(`${noteSelect()} WHERE project_id = ? ORDER BY notes.created_at ASC`).all(req.project.id)
+    : db.prepare(`${noteSelect()} WHERE project_id = ? AND visibility = 'everyone' ORDER BY notes.created_at ASC`).all(req.project.id);
   res.json(rows);
 });
 
 router.post('/', requireAuth, requireProjectAccess(db), asyncHandler(async (req, res) => {
-  const { body } = req.body || {};
+  const { body, visibility } = req.body || {};
   if (!body || !body.trim()) return res.status(400).json({ error: 'body required' });
 
+  // Only admins may post an admin-only note — crew-authored notes always
+  // default to 'everyone' regardless of what's sent.
+  const noteVisibility = req.session.role === 'admin' && visibility === 'admin' ? 'admin' : 'everyone';
+
   const info = db
-    .prepare(`INSERT INTO notes (project_id, author_id, body) VALUES (?, ?, ?)`)
-    .run(req.project.id, req.session.userId, body);
+    .prepare(`INSERT INTO notes (project_id, author_id, body, visibility) VALUES (?, ?, ?, ?)`)
+    .run(req.project.id, req.session.userId, body, noteVisibility);
 
   const project = req.project;
-  if (req.session.role === 'admin') {
-    await notify(project.crew_id, 'note', `Note on ${project.name}`, project.id);
-  } else {
-    for (const adminId of getAdminUserIds()) {
-      await notify(adminId, 'note', `Note on ${project.name}`, project.id);
+  // An admin-only note has nothing to notify the crew about — they can't see it.
+  if (noteVisibility === 'everyone') {
+    if (req.session.role === 'admin') {
+      await notify(project.crew_id, 'note', `Note on ${project.name}`, project.id);
+    } else {
+      for (const adminId of getAdminUserIds()) {
+        await notify(adminId, 'note', `Note on ${project.name}`, project.id);
+      }
     }
   }
 
@@ -46,6 +53,9 @@ router.post('/', requireAuth, requireProjectAccess(db), asyncHandler(async (req,
 router.post('/:noteId/translate', requireAuth, requireProjectAccess(db), asyncHandler(async (req, res) => {
   const note = db.prepare('SELECT * FROM notes WHERE id = ? AND project_id = ?').get(req.params.noteId, req.project.id);
   if (!note) return res.status(404).json({ error: 'Note not found' });
+  if (note.visibility === 'admin' && req.session.role !== 'admin') {
+    return res.status(404).json({ error: 'Note not found' });
+  }
 
   if (note.body_es) return res.json({ body_es: note.body_es });
 

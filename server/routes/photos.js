@@ -16,6 +16,12 @@ const router = express.Router({ mergeParams: true });
 const KIND_TO_CATEGORY = { picture: 'photo', receipt: 'receipt' };
 const KIND_LABEL = { picture: 'photo', receipt: 'receipt' };
 
+const VIDEO_EXT_BY_MIME = {
+  'video/mp4': '.mp4',
+  'video/quicktime': '.mov',
+  'video/webm': '.webm',
+};
+
 async function saveImage(buffer) {
   const id = crypto.randomBytes(16).toString('hex');
   const fileName = `${id}.jpg`;
@@ -33,7 +39,17 @@ async function saveImage(buffer) {
     .jpeg({ quality: 75 })
     .toFile(path.join(config.uploadsPath, thumbName));
 
-  return { file_path: fileName, thumb_path: thumbName };
+  return { media_type: 'image', file_path: fileName, thumb_path: thumbName, mime: 'image/jpeg' };
+}
+
+// Videos aren't processed by sharp — stored as-is, no thumbnail. The grid
+// shows a generic video tile instead of an image thumb for these.
+function saveVideo(buffer, mimetype) {
+  const id = crypto.randomBytes(16).toString('hex');
+  const ext = VIDEO_EXT_BY_MIME[mimetype] || '';
+  const fileName = `${id}${ext}`;
+  fs.writeFileSync(path.join(config.uploadsPath, fileName), buffer);
+  return { media_type: 'video', file_path: fileName, thumb_path: null, mime: mimetype };
 }
 
 function photoSelect() {
@@ -66,15 +82,20 @@ router.post('/', requireAuth, requireProjectAccess(db), upload.array('files', 20
     return res.status(400).json({ error: 'No files uploaded' });
   }
 
+  const caption = (req.body.caption || '').trim() || null;
   const project = req.project;
   const saved = [];
   const insert = db.prepare(
-    `INSERT INTO photos (project_id, author_id, kind, file_path, thumb_path) VALUES (?, ?, ?, ?, ?)`
+    `INSERT INTO photos (project_id, author_id, kind, media_type, file_path, thumb_path, mime, caption)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
   );
 
   for (const file of req.files) {
-    const { file_path, thumb_path } = await saveImage(file.buffer);
-    const info = insert.run(project.id, req.session.userId, kind, file_path, thumb_path);
+    const isVideo = file.mimetype && file.mimetype.startsWith('video/');
+    const { media_type, file_path, thumb_path, mime } = isVideo
+      ? saveVideo(file.buffer, file.mimetype)
+      : await saveImage(file.buffer);
+    const info = insert.run(project.id, req.session.userId, kind, media_type, file_path, thumb_path, mime, caption);
     saved.push(db.prepare(`${photoSelect()} WHERE photos.id = ?`).get(info.lastInsertRowid));
   }
 
@@ -93,12 +114,23 @@ router.post('/', requireAuth, requireProjectAccess(db), upload.array('files', 20
   res.status(201).json(saved);
 }));
 
+router.patch('/:photoId', requireAuth, requireAdmin, requireProjectAccess(db), (req, res) => {
+  const photo = db.prepare('SELECT * FROM photos WHERE id = ? AND project_id = ?').get(req.params.photoId, req.project.id);
+  if (!photo) return res.status(404).json({ error: 'Not found' });
+
+  const { caption } = req.body || {};
+  db.prepare('UPDATE photos SET caption = ? WHERE id = ?').run(caption !== undefined ? (caption || null) : photo.caption, photo.id);
+
+  const updated = db.prepare(`${photoSelect()} WHERE photos.id = ?`).get(photo.id);
+  res.json(updated);
+});
+
 router.delete('/:photoId', requireAuth, requireAdmin, requireProjectAccess(db), (req, res) => {
   const photo = db.prepare('SELECT * FROM photos WHERE id = ? AND project_id = ?').get(req.params.photoId, req.project.id);
   if (!photo) return res.status(404).json({ error: 'Not found' });
   db.prepare('DELETE FROM photos WHERE id = ?').run(photo.id);
   for (const p of [photo.file_path, photo.thumb_path]) {
-    fs.unlink(path.join(config.uploadsPath, p), () => {});
+    if (p) fs.unlink(path.join(config.uploadsPath, p), () => {});
   }
   res.json({ ok: true });
 });

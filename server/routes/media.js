@@ -27,12 +27,14 @@ function loadPhotoWithAccess(req, res) {
 router.get('/:photoId/full', requireAuth, (req, res) => {
   const photo = loadPhotoWithAccess(req, res);
   if (!photo) return;
+  if (photo.mime) res.setHeader('Content-Type', photo.mime);
   res.sendFile(path.join(config.uploadsPath, photo.file_path));
 });
 
 router.get('/:photoId/thumb', requireAuth, (req, res) => {
   const photo = loadPhotoWithAccess(req, res);
   if (!photo) return;
+  if (!photo.thumb_path) return res.status(404).end();
   res.sendFile(path.join(config.uploadsPath, photo.thumb_path));
 });
 

@@ -31,4 +31,14 @@ router.post('/read-all', requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
+router.delete('/:id', requireAuth, (req, res) => {
+  db.prepare('DELETE FROM notifications WHERE id = ? AND user_id = ?').run(req.params.id, req.session.userId);
+  res.json({ ok: true });
+});
+
+router.delete('/', requireAuth, (req, res) => {
+  db.prepare('DELETE FROM notifications WHERE user_id = ?').run(req.session.userId);
+  res.json({ ok: true });
+});
+
 module.exports = router;

@@ -32,6 +32,7 @@ const documentMediaRoutes = require('./routes/documentMedia');
 const eventRoutes = require('./routes/events');
 const teamRoutes = require('./routes/team');
 const notificationRoutes = require('./routes/notifications');
+const { advanceScheduledProjects } = require('./services/projectStatus');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -54,6 +55,13 @@ app.use(
 );
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
+
+// Cheap single-statement check so a project's status is never stale by
+// more than one request, without needing a background timer/cron.
+app.use('/api', (req, res, next) => {
+  advanceScheduledProjects();
+  next();
+});
 
 app.use('/api/auth', authRoutes);
 app.use('/api/projects', projectRoutes);

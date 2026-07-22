@@ -68,6 +68,36 @@ router.post('/:noteId/translate', requireAuth, requireProjectAccess(db), asyncHa
   res.json({ body_es: translated });
 }));
 
+// Anyone on the project can edit any note (matches Orders), same as adding
+// one — deleting is admin-only, same as everywhere else in the app.
+router.patch('/:noteId', requireAuth, requireProjectAccess(db), (req, res) => {
+  const note = db.prepare('SELECT * FROM notes WHERE id = ? AND project_id = ?').get(req.params.noteId, req.project.id);
+  if (!note) return res.status(404).json({ error: 'Note not found' });
+  if (note.visibility === 'admin' && req.session.role !== 'admin') {
+    return res.status(404).json({ error: 'Note not found' });
+  }
+
+  const { body, visibility } = req.body || {};
+  if (body !== undefined && !body.trim()) return res.status(400).json({ error: 'body required' });
+
+  const nextBody = body !== undefined ? body : note.body;
+  const bodyChanged = nextBody !== note.body;
+  // Only an admin editor may change visibility; a crew editor leaves it as-is.
+  const nextVisibility = req.session.role === 'admin' && (visibility === 'admin' || visibility === 'everyone')
+    ? visibility
+    : note.visibility;
+
+  db.prepare('UPDATE notes SET body = ?, body_es = ?, visibility = ? WHERE id = ?').run(
+    nextBody,
+    bodyChanged ? null : note.body_es, // stale translation would no longer match
+    nextVisibility,
+    note.id
+  );
+
+  const updated = db.prepare(`${noteSelect()} WHERE notes.id = ?`).get(note.id);
+  res.json(updated);
+});
+
 router.delete('/:noteId', requireAuth, requireAdmin, requireProjectAccess(db), (req, res) => {
   db.prepare('DELETE FROM notes WHERE id = ? AND project_id = ?').run(req.params.noteId, req.project.id);
   res.json({ ok: true });

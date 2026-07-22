@@ -57,8 +57,41 @@ router.post('/', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
   res.status(201).json(event);
 }));
 
+router.patch('/:id', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  const existing = db.prepare('SELECT * FROM events WHERE id = ?').get(req.params.id);
+  if (!existing) return res.status(404).json({ error: 'Not found' });
+  if (existing.auto_type) {
+    return res.status(400).json({ error: 'Job start/end dates are edited from the project page, not here' });
+  }
+
+  const { project_id, date, time_label, title } = req.body || {};
+  const nextProjectId = project_id !== undefined ? project_id : existing.project_id;
+
+  const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(nextProjectId);
+  if (!project) return res.status(400).json({ error: 'Invalid project' });
+
+  db.prepare(
+    `UPDATE events SET project_id = ?, crew_id = ?, date = ?, time_label = ?, title = ? WHERE id = ?`
+  ).run(
+    nextProjectId,
+    project.crew_id,
+    date !== undefined ? date : existing.date,
+    time_label !== undefined ? time_label : existing.time_label,
+    title !== undefined ? title : existing.title,
+    existing.id
+  );
+
+  const updated = db.prepare(`${eventSelect()} WHERE events.id = ?`).get(existing.id);
+  res.json(updated);
+}));
+
 router.delete('/:id', requireAuth, requireAdmin, (req, res) => {
-  db.prepare('DELETE FROM events WHERE id = ?').run(req.params.id);
+  const existing = db.prepare('SELECT * FROM events WHERE id = ?').get(req.params.id);
+  if (!existing) return res.status(404).json({ error: 'Not found' });
+  if (existing.auto_type) {
+    return res.status(400).json({ error: 'Job start/end dates are cleared from the project page, not here' });
+  }
+  db.prepare('DELETE FROM events WHERE id = ?').run(existing.id);
   res.json({ ok: true });
 });
 

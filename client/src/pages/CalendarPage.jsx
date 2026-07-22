@@ -28,8 +28,13 @@ function dateStr(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-function NewEventModal({ projects, onClose, onCreated }) {
-  const [form, setForm] = useState({ project_id: projects[0]?.id || '', date: dateStr(new Date()), time_label: '', title: '' });
+function EventModal({ projects, event, onClose, onCreated, onUpdated }) {
+  const isEdit = Boolean(event);
+  const [form, setForm] = useState(
+    isEdit
+      ? { project_id: event.project_id, date: event.date, time_label: event.time_label || '', title: event.title }
+      : { project_id: projects[0]?.id || '', date: dateStr(new Date()), time_label: '', title: '' }
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -38,8 +43,13 @@ function NewEventModal({ projects, onClose, onCreated }) {
     setBusy(true);
     setError('');
     try {
-      const event = await api.post('/events', form);
-      onCreated(event);
+      if (isEdit) {
+        const updated = await api.patch(`/events/${event.id}`, form);
+        onUpdated(updated);
+      } else {
+        const created = await api.post('/events', form);
+        onCreated(created);
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -49,7 +59,7 @@ function NewEventModal({ projects, onClose, onCreated }) {
 
   return (
     <Modal onClose={onClose}>
-      <h2 style={{ marginTop: 0 }}>New event</h2>
+      <h2 style={{ marginTop: 0 }}>{isEdit ? 'Edit event' : 'New event'}</h2>
       <form onSubmit={submit}>
         <div className="field">
           <label>Project</label>
@@ -72,7 +82,7 @@ function NewEventModal({ projects, onClose, onCreated }) {
         {error && <div className="login-error" style={{ color: '#b3261e' }}>{error}</div>}
         <div className="modal-actions">
           <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
-          <button type="submit" className="btn btn-primary" disabled={busy}>{busy ? 'Adding…' : 'Add'}</button>
+          <button type="submit" className="btn btn-primary" disabled={busy}>{busy ? 'Saving…' : isEdit ? 'Save' : 'Add'}</button>
         </div>
       </form>
     </Modal>
@@ -86,6 +96,7 @@ export default function CalendarPage() {
   const [projects, setProjects] = useState([]);
   const [selectedDay, setSelectedDay] = useState(dateStr(new Date()));
   const [showNew, setShowNew] = useState(false);
+  const [editingEvent, setEditingEvent] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const load = async () => {
@@ -134,6 +145,14 @@ export default function CalendarPage() {
   // Manual, specifically-scheduled events (site visits etc.) — auto Job
   // start/end rows are left out here since dayProjects already covers them.
   const dayManualEvents = (eventsByDay[selectedDay] || []).filter((ev) => !ev.auto_type);
+
+  const deleteEvent = async (e, ev) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!confirm('Delete this event?')) return;
+    await api.delete(`/events/${ev.id}`);
+    setEvents((prev) => prev.filter((x) => x.id !== ev.id));
+  };
 
   return (
     <div className="page">
@@ -229,6 +248,17 @@ export default function CalendarPage() {
                       <div><strong>{ev.time_label}</strong> {ev.title}</div>
                       <div className="meta" style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>{ev.project_name} · {ev.crew_short_name}</div>
                     </div>
+                    {user.role === 'admin' && (
+                      <div style={{ display: 'flex', gap: 4, marginLeft: 'auto' }}>
+                        <button
+                          className="card-edit-btn"
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditingEvent(ev); }}
+                        >
+                          Edit
+                        </button>
+                        <button className="card-edit-btn" onClick={(e) => deleteEvent(e, ev)}>Delete</button>
+                      </div>
+                    )}
                   </Link>
                 ))}
               </>
@@ -238,10 +268,23 @@ export default function CalendarPage() {
       )}
 
       {showNew && (
-        <NewEventModal
+        <EventModal
           projects={projects}
           onClose={() => setShowNew(false)}
           onCreated={(event) => { setShowNew(false); setEvents((prev) => [...prev, event]); setSelectedDay(event.date); }}
+        />
+      )}
+
+      {editingEvent && (
+        <EventModal
+          projects={projects}
+          event={editingEvent}
+          onClose={() => setEditingEvent(null)}
+          onUpdated={(updated) => {
+            setEditingEvent(null);
+            setEvents((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
+            setSelectedDay(updated.date);
+          }}
         />
       )}
     </div>

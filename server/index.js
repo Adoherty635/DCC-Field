@@ -19,6 +19,7 @@ process.on('unhandledRejection', (reason) => {
 require('./db'); // ensures schema is created before anything else touches it
 const sessionStore = require('./db/sessionStore');
 const seed = require('./scripts/seed'); // no-ops once users already exist
+const resetPasswords = require('./scripts/reset-password');
 
 const authRoutes = require('./routes/auth');
 const projectRoutes = require('./routes/projects');
@@ -89,6 +90,21 @@ app.get(/^\/(?!api).*/, (req, res) => {
 });
 
 seed();
+
+// Temporary one-time admin recovery hook: set ONE_TIME_PASSWORD_RESET to
+// "username:password,username:password" and redeploy to apply, then remove
+// the variable. Intended to be deleted from the codebase once used.
+if (process.env.ONE_TIME_PASSWORD_RESET) {
+  try {
+    const pairs = process.env.ONE_TIME_PASSWORD_RESET.split(',').map((entry) => {
+      const [username, password] = entry.split(':');
+      return [username, password];
+    });
+    resetPasswords(pairs);
+  } catch (err) {
+    console.error('[one-time-password-reset] failed:', err.message);
+  }
+}
 
 app.listen(config.port, () => {
   console.log(`DCC Project Manager listening on port ${config.port}`);

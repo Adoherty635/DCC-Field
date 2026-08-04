@@ -7,9 +7,12 @@ const BCRYPT_COST = 12;
 // Usage: node server/scripts/reset-password.js <username> <newPassword> [<username2> <newPassword2> ...]
 function resetPasswords(pairs) {
   for (const [username, password] of pairs) {
-    const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
+    const user = db
+      .prepare('SELECT * FROM users WHERE username = ? COLLATE NOCASE')
+      .get(username);
     if (!user) {
-      console.error(`No user found with username "${username}" — skipped.`);
+      const existing = db.prepare('SELECT username FROM users').all().map((u) => u.username);
+      console.error(`No user found with username "${username}" — skipped. Existing usernames: ${existing.join(', ')}`);
       continue;
     }
     const password_hash = bcrypt.hashSync(password, BCRYPT_COST);

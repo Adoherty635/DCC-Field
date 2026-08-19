@@ -456,6 +456,49 @@ textarea.scope-editor {
   cursor: pointer;
 }
 
+.photo-thumb.picked {
+  outline: 3px solid var(--primary);
+  outline-offset: -3px;
+}
+
+.pick-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.pick-count {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  margin-right: 2px;
+}
+
+.pick-check {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 2px solid #fff;
+  background: rgba(0,0,0,0.35);
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}
+
+.pick-check.on {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
 .photo-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
 .photo-meta-overlay {

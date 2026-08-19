@@ -17,6 +17,9 @@ export default function PhotoGrid({ projectId, kind, canUpload, canDelete, onCou
   const [noteDraft, setNoteDraft] = useState('');
   const [editingCaption, setEditingCaption] = useState(false);
   const [captionDraft, setCaptionDraft] = useState('');
+  const [pickMode, setPickMode] = useState(false);
+  const [pickedIds, setPickedIds] = useState(() => new Set());
+  const [zipping, setZipping] = useState(false);
   const fileInput = useRef(null);
 
   const load = async () => {
@@ -63,6 +66,62 @@ export default function PhotoGrid({ projectId, kind, canUpload, canDelete, onCou
     setEditingCaption(false);
   };
 
+  const exitPickMode = () => {
+    setPickMode(false);
+    setPickedIds(new Set());
+  };
+
+  const togglePick = (id) => {
+    setPickedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    setPickedIds((prev) => (prev.size === photos.length ? new Set() : new Set(photos.map((p) => p.id))));
+  };
+
+  const downloadPicked = async () => {
+    if (!pickedIds.size) return;
+    setZipping(true);
+    try {
+      if (pickedIds.size === 1) {
+        const [id] = pickedIds;
+        const a = document.createElement('a');
+        a.href = `/api/media/${id}/full`;
+        a.download = '';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      } else {
+        const res = await fetch(`/api/projects/${projectId}/photos/zip`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids: [...pickedIds] }),
+        });
+        if (!res.ok) throw new Error('Download failed');
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${kind}s.zip`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      }
+      exitPickMode();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setZipping(false);
+    }
+  };
+
   if (loading) return <div className="loading-state">Loading…</div>;
 
   return (
@@ -94,6 +153,25 @@ export default function PhotoGrid({ projectId, kind, canUpload, canDelete, onCou
         </div>
       )}
 
+      {photos.length > 0 && (
+        <div className="pick-toolbar">
+          {pickMode ? (
+            <>
+              <span className="pick-count">{pickedIds.size} selected</span>
+              <button className="btn btn-secondary" onClick={toggleSelectAll}>
+                {pickedIds.size === photos.length ? 'Deselect all' : 'Select all'}
+              </button>
+              <button className="btn btn-primary" onClick={downloadPicked} disabled={!pickedIds.size || zipping}>
+                {zipping ? 'Preparing…' : 'Download'}
+              </button>
+              <button className="btn btn-secondary" onClick={exitPickMode}>Cancel</button>
+            </>
+          ) : (
+            <button className="btn btn-secondary" onClick={() => setPickMode(true)}>Select</button>
+          )}
+        </div>
+      )}
+
       {photos.length === 0 ? (
         <div className="empty-state">No photos yet.</div>
       ) : (
@@ -101,9 +179,17 @@ export default function PhotoGrid({ projectId, kind, canUpload, canDelete, onCou
           {photos.map((p) => (
             <button
               key={p.id}
-              className={p.media_type === 'video' ? 'photo-thumb doc-file-tile' : 'photo-thumb'}
-              onClick={() => { setSelected(p); setEditingCaption(false); setCaptionDraft(p.caption || ''); }}
+              className={`${p.media_type === 'video' ? 'photo-thumb doc-file-tile' : 'photo-thumb'} ${pickedIds.has(p.id) ? 'picked' : ''}`}
+              onClick={() => {
+                if (pickMode) togglePick(p.id);
+                else { setSelected(p); setEditingCaption(false); setCaptionDraft(p.caption || ''); }
+              }}
             >
+              {pickMode && (
+                <span className={`pick-check ${pickedIds.has(p.id) ? 'on' : ''}`}>
+                  {pickedIds.has(p.id) ? '✓' : ''}
+                </span>
+              )}
               {p.media_type === 'video' ? (
                 <span className="doc-file-icon">🎬</span>
               ) : (

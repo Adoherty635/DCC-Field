@@ -2,6 +2,7 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const archiver = require('archiver');
 const sharp = require('sharp');
 const db = require('../db');
 const config = require('../config');
@@ -71,6 +72,42 @@ router.get('/', requireAuth, requireProjectAccess(db), (req, res) => {
       .all(req.project.id);
   }
   res.json(rows);
+});
+
+// Bundles selected photos/videos into a single zip stream — same download
+// access as a single file (any project member, not just admin).
+router.post('/zip', requireAuth, requireProjectAccess(db), (req, res) => {
+  const ids = Array.isArray(req.body && req.body.ids) ? req.body.ids.map(Number).filter(Number.isInteger) : [];
+  if (!ids.length) {
+    return res.status(400).json({ error: 'ids required' });
+  }
+
+  const placeholders = ids.map(() => '?').join(',');
+  const rows = db
+    .prepare(`SELECT * FROM photos WHERE project_id = ? AND id IN (${placeholders})`)
+    .all(req.project.id, ...ids);
+  if (!rows.length) return res.status(404).json({ error: 'No photos found' });
+
+  const safeProjectName = req.project.name.replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '') || 'project';
+  res.setHeader('Content-Type', 'application/zip');
+  res.setHeader('Content-Disposition', `attachment; filename="${safeProjectName}-photos.zip"`);
+
+  const archive = archiver('zip', { zlib: { level: 9 } });
+  archive.on('error', (err) => {
+    console.error('[zip] archive error:', err.message);
+    res.destroy(err);
+  });
+  archive.pipe(res);
+
+  rows.forEach((photo, i) => {
+    const ext = path.extname(photo.file_path) || '';
+    const author = db.prepare('SELECT short_name FROM users WHERE id = ?').get(photo.author_id);
+    const safeAuthor = (author && author.short_name || 'photo').replace(/[^a-z0-9]+/gi, '');
+    const entryName = `${String(i + 1).padStart(2, '0')}-${safeAuthor}${ext}`;
+    archive.file(path.join(config.uploadsPath, photo.file_path), { name: entryName });
+  });
+
+  archive.finalize();
 });
 
 router.post('/', requireAuth, requireProjectAccess(db), upload.array('files', 20), asyncHandler(async (req, res) => {

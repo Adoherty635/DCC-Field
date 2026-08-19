@@ -439,6 +439,15 @@ textarea.scope-editor {
 }
 
 /* Photo grid */
+.select-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.select-toolbar .select-count { font-size: 0.85rem; color: var(--text-muted); }
+
 .photo-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
@@ -454,6 +463,27 @@ textarea.scope-editor {
   border: none;
   padding: 0;
   cursor: pointer;
+}
+
+.photo-select-mark {
+  position: absolute;
+  top: 6px; right: 6px;
+  width: 22px; height: 22px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.85);
+  border: 2px solid #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.photo-select-mark.checked {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
 }
 
 .photo-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }

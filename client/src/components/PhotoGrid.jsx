@@ -17,6 +17,9 @@ export default function PhotoGrid({ projectId, kind, canUpload, canDelete, onCou
   const [noteDraft, setNoteDraft] = useState('');
   const [editingCaption, setEditingCaption] = useState(false);
   const [captionDraft, setCaptionDraft] = useState('');
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [zipping, setZipping] = useState(false);
   const fileInput = useRef(null);
 
   const load = async () => {
@@ -63,6 +66,43 @@ export default function PhotoGrid({ projectId, kind, canUpload, canDelete, onCou
     setEditingCaption(false);
   };
 
+  const toggleSelectMode = () => {
+    setSelectMode((on) => !on);
+    setSelectedIds(new Set());
+  };
+
+  const toggleSelected = (photoId) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(photoId)) next.delete(photoId);
+      else next.add(photoId);
+      return next;
+    });
+  };
+
+  const downloadSelected = async () => {
+    if (!selectedIds.size || zipping) return;
+    setZipping(true);
+    try {
+      const url = `/api/projects/${projectId}/photos/download?ids=${[...selectedIds].join(',')}`;
+      const res = await fetch(url, { credentials: 'include' });
+      if (!res.ok) throw new Error('Download failed');
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = objectUrl;
+      a.download = 'photos.zip';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(objectUrl);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setZipping(false);
+    }
+  };
+
   if (loading) return <div className="loading-state">Loading…</div>;
 
   return (
@@ -97,22 +137,55 @@ export default function PhotoGrid({ projectId, kind, canUpload, canDelete, onCou
       {photos.length === 0 ? (
         <div className="empty-state">No photos yet.</div>
       ) : (
-        <div className="photo-grid">
-          {photos.map((p) => (
-            <button
-              key={p.id}
-              className={p.media_type === 'video' ? 'photo-thumb doc-file-tile' : 'photo-thumb'}
-              onClick={() => { setSelected(p); setEditingCaption(false); setCaptionDraft(p.caption || ''); }}
-            >
-              {p.media_type === 'video' ? (
-                <span className="doc-file-icon">🎬</span>
-              ) : (
-                <img src={`/api/media/${p.id}/thumb`} alt="" loading="lazy" />
-              )}
-              <div className="photo-meta-overlay">{p.author_short_name}</div>
-            </button>
-          ))}
-        </div>
+        <>
+          <div className="select-toolbar">
+            {selectMode ? (
+              <>
+                <span className="select-count">{selectedIds.size} selected</span>
+                <button
+                  className="btn btn-primary"
+                  onClick={downloadSelected}
+                  disabled={!selectedIds.size || zipping}
+                >
+                  {zipping ? 'Zipping…' : 'Download'}
+                </button>
+                <button className="toggle-es" onClick={toggleSelectMode}>Cancel</button>
+              </>
+            ) : (
+              <button className="toggle-es" onClick={toggleSelectMode}>Select</button>
+            )}
+          </div>
+
+          <div className="photo-grid">
+            {photos.map((p) => (
+              <button
+                key={p.id}
+                className={p.media_type === 'video' ? 'photo-thumb doc-file-tile' : 'photo-thumb'}
+                onClick={() => {
+                  if (selectMode) {
+                    toggleSelected(p.id);
+                  } else {
+                    setSelected(p);
+                    setEditingCaption(false);
+                    setCaptionDraft(p.caption || '');
+                  }
+                }}
+              >
+                {p.media_type === 'video' ? (
+                  <span className="doc-file-icon">🎬</span>
+                ) : (
+                  <img src={`/api/media/${p.id}/thumb`} alt="" loading="lazy" />
+                )}
+                <div className="photo-meta-overlay">{p.author_short_name}</div>
+                {selectMode && (
+                  <span className={`photo-select-mark${selectedIds.has(p.id) ? ' checked' : ''}`}>
+                    {selectedIds.has(p.id) ? '✓' : ''}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        </>
       )}
 
       {selected && (

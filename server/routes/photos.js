@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const sharp = require('sharp');
+const { ZipArchive } = require('archiver');
 const db = require('../db');
 const config = require('../config');
 const upload = require('../middleware/upload');
@@ -71,6 +72,37 @@ router.get('/', requireAuth, requireProjectAccess(db), (req, res) => {
       .all(req.project.id);
   }
   res.json(rows);
+});
+
+router.get('/download', requireAuth, requireProjectAccess(db), (req, res) => {
+  const ids = (req.query.ids || '')
+    .split(',')
+    .map((s) => parseInt(s, 10))
+    .filter((n) => Number.isInteger(n));
+  if (!ids.length) return res.status(400).json({ error: 'Missing ids' });
+
+  const placeholders = ids.map(() => '?').join(',');
+  const rows = db
+    .prepare(`SELECT * FROM photos WHERE project_id = ? AND id IN (${placeholders})`)
+    .all(req.project.id, ...ids);
+  if (!rows.length) return res.status(404).json({ error: 'Not found' });
+
+  res.setHeader('Content-Type', 'application/zip');
+  res.setHeader('Content-Disposition', `attachment; filename="photos.zip"`);
+
+  const archive = new ZipArchive({ zlib: { level: 9 } });
+  archive.on('error', (err) => {
+    console.error('[photos/download] archive error:', err.message);
+    res.destroy(err);
+  });
+  archive.pipe(res);
+
+  rows.forEach((photo, i) => {
+    const ext = path.extname(photo.file_path) || '';
+    archive.file(path.join(config.uploadsPath, photo.file_path), { name: `photo-${i + 1}${ext}` });
+  });
+
+  archive.finalize();
 });
 
 router.post('/', requireAuth, requireProjectAccess(db), upload.array('files', 20), asyncHandler(async (req, res) => {

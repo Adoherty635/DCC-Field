@@ -3,13 +3,13 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const archiver = require('archiver');
-const sharp = require('sharp');
 const db = require('../db');
 const config = require('../config');
 const upload = require('../middleware/upload');
 const { requireAuth, requireAdmin, requireProjectAccess } = require('../middleware/auth');
 const { notifyBatched } = require('../services/notify');
 const { getAdminUserIds } = require('../services/recipients');
+const { saveImage: saveImageFile } = require('../services/imageStorage');
 const asyncHandler = require('../middleware/asyncHandler');
 
 const router = express.Router({ mergeParams: true });
@@ -24,23 +24,8 @@ const VIDEO_EXT_BY_MIME = {
 };
 
 async function saveImage(buffer) {
-  const id = crypto.randomBytes(16).toString('hex');
-  const fileName = `${id}.jpg`;
-  const thumbName = `${id}_thumb.jpg`;
-
-  await sharp(buffer)
-    .rotate()
-    .resize({ width: 1600, withoutEnlargement: true })
-    .jpeg({ quality: 82 })
-    .toFile(path.join(config.uploadsPath, fileName));
-
-  await sharp(buffer)
-    .rotate()
-    .resize({ width: 400, withoutEnlargement: true })
-    .jpeg({ quality: 75 })
-    .toFile(path.join(config.uploadsPath, thumbName));
-
-  return { media_type: 'image', file_path: fileName, thumb_path: thumbName, mime: 'image/jpeg' };
+  const saved = await saveImageFile(buffer);
+  return { media_type: 'image', ...saved };
 }
 
 // Videos aren't processed by sharp — stored as-is, no thumbnail. The grid

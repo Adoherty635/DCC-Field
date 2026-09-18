@@ -2,13 +2,13 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const sharp = require('sharp');
 const db = require('../db');
 const config = require('../config');
 const { requireAuth, requireAdmin, requireProjectAccess } = require('../middleware/auth');
 const uploadDoc = require('../middleware/uploadDoc');
 const { notify } = require('../services/notify');
 const { getAdminUserIds } = require('../services/recipients');
+const { saveImage } = require('../services/imageStorage');
 const asyncHandler = require('../middleware/asyncHandler');
 
 const router = express.Router({ mergeParams: true });
@@ -47,13 +47,8 @@ async function saveUpload(file) {
     return { file_path: fileName, thumb_path: null };
   }
 
-  const fileName = `${id}.jpg`;
-  const thumbName = `${id}_thumb.jpg`;
-  await sharp(file.buffer).rotate().resize({ width: 2000, withoutEnlargement: true }).jpeg({ quality: 88 })
-    .toFile(path.join(config.uploadsPath, fileName));
-  await sharp(file.buffer).rotate().resize({ width: 400, withoutEnlargement: true }).jpeg({ quality: 75 })
-    .toFile(path.join(config.uploadsPath, thumbName));
-  return { file_path: fileName, thumb_path: thumbName };
+  const { file_path, thumb_path } = await saveImage(file.buffer, { maxWidth: 2000, quality: 88 });
+  return { file_path, thumb_path };
 }
 
 router.get('/', requireAuth, requireProjectAccess(db), (req, res) => {

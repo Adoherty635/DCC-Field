@@ -199,10 +199,11 @@ router.delete('/:id', requireAuth, requireAdmin, requireProjectAccess(db), (req,
 
   const photoFiles = db.prepare('SELECT file_path, thumb_path FROM photos WHERE project_id = ?').all(project.id);
   const docFiles = db.prepare('SELECT file_path, thumb_path FROM documents WHERE project_id = ?').all(project.id);
+  const punchFiles = db.prepare('SELECT file_path, thumb_path FROM punch_items WHERE project_id = ?').all(project.id);
 
   db.prepare('DELETE FROM projects WHERE id = ?').run(project.id);
 
-  for (const row of [...photoFiles, ...docFiles]) {
+  for (const row of [...photoFiles, ...docFiles, ...punchFiles]) {
     for (const p of [row.file_path, row.thumb_path]) {
       if (p) fs.unlink(path.join(config.uploadsPath, p), () => {});
     }

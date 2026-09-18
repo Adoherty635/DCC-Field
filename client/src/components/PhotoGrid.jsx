@@ -145,7 +145,6 @@ export default function PhotoGrid({ projectId, kind, canUpload, canDelete, onCou
               type="file"
               accept={ACCEPT}
               multiple
-              capture="environment"
               onChange={onFiles}
               disabled={uploading}
             />

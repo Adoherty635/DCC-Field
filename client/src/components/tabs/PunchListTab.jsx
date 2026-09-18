@@ -69,7 +69,6 @@ function PunchItemRow({ item, projectId, isAdmin, onUpdated, onDeleted }) {
               <input
                 type="file"
                 accept="image/*"
-                capture="environment"
                 style={{ display: 'none' }}
                 onChange={(e) => setDraftFile(e.target.files[0] || null)}
               />
@@ -139,7 +138,6 @@ function AddPunchItem({ projectId, onAdded }) {
             ref={fileInput}
             type="file"
             accept="image/*"
-            capture="environment"
             onChange={(e) => setFile(e.target.files[0] || null)}
           />
         </label>
